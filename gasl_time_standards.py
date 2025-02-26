@@ -4,7 +4,7 @@ from datetime import datetime
 import math
 import glob
 import hashlib
-from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, create_event_name
+from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, create_event_name, add_event_names_column
 
 # Function to get the 90th percentile threshold and count of values meeting/exceeding the threshold for each unique event
 def get_percentile_summary(df, standard, pct):
@@ -68,7 +68,6 @@ def dedup_entries(df):
     return df_final
 def add_event_names(df):
     # Use the utility function to add event names to the DataFrame
-    from utils import add_event_names_column
     add_event_names_column(df)
     return
 
