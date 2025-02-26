@@ -4,54 +4,7 @@ from datetime import datetime
 import math
 import glob
 import hashlib
-
-# Function to read CSV files and concatenate them into a single DataFrame
-def read_csv_files(file_path_pattern):
-    # Use glob to find all files matching the pattern
-    files = glob.glob(file_path_pattern)
-    # Read all files and concatenate them into a single DataFrame
-    df_list = [pd.read_csv(file) for file in files]
-    combined_df = pd.concat(df_list, ignore_index=True)
-    return combined_df
-
-# Function to convert hundredths of a second to MM:SS.hh format
-def convert_hundredths_to_time(hundredths):
-    negative = False
-    if hundredths < 0:
-        negative = True
-        hundredths = abs(hundredths)
-    total_seconds = hundredths / 100.0
-    minutes = int(total_seconds // 60)
-    hours = int(minutes // 60)
-    seconds = int(total_seconds % 60)
-    hundredths = int((total_seconds - minutes * 60 - seconds) * 100)
-    if hours > 0:
-        if negative:
-             return f"-{hours:02}:{int(minutes % 60)}:{seconds:02}"
-        else:
-            return f"{hours:02}:{int(minutes % 60)}:{seconds:02}"
-    else:
-        if negative:
-            return f"-{minutes:02}:{seconds:02}.{hundredths:02}"
-        else:
-            return f"{minutes:02}:{seconds:02}.{hundredths:02}"
-
-def convert_time_to_hundredths(time):
-    if not isinstance(time, str):
-        return 0
-    if ":" not in time:
-        time = f'00:{time}'
-    minutes = int(time.split(":")[0])
-    seconds_with_hundredths = time.split(":")[1]
-    
-    try:
-        seconds = int(int(seconds_with_hundredths.split('.')[0]) + (minutes * 60))
-    except:
-        print(time)
-    hundredths = int(seconds_with_hundredths.split('.')[1])
-    
-    total_hundredths = int((hundredths + (seconds * 100)))
-    return total_hundredths
+from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, create_event_name
 
 # Function to get the 90th percentile threshold and count of values meeting/exceeding the threshold for each unique event
 def get_percentile_summary(df, standard, pct):
@@ -114,26 +67,10 @@ def dedup_entries(df):
     
     return df_final
 def add_event_names(df):
-    # Group by 'age_group', 'distance', and 'stroke' to create unique events
-    grouped = df.groupby(['age_group', 'distance', 'stroke'])
-
-    # Lists to store the results
-    event_names = []
-
-    for name, group in grouped:
-        # Create the event name
-        event_name = f"{name[0]}_{name[1]}_{name[2]}"
-
-        # Store the results
-        event_names.append(event_name)
-    
-    # Create a summary DataFrame
-    summary_df = pd.DataFrame({
-        'Event_name': event_names
-    })
-    df['Event_name'] = event_names
-
-    return 
+    # Use the utility function to add event names to the DataFrame
+    from utils import add_event_names_column
+    add_event_names_column(df)
+    return
 
 def get_team_attendance_summary(df):
     summary = (
@@ -368,8 +305,7 @@ def main():
 
     # Get the current standards, generate event_names
     current_standards = read_csv_files('./current_standards.csv')
-    current_standards = current_standards.assign(Event_name = current_standards.age_group.astype(str) + '_' + \
-        current_standards.distance.astype(str) + '_' + current_standards.stroke.astype(str))
+    current_standards = add_event_names_column(current_standards)
     current_standards = current_standards.drop(['age_group', 'distance', 'stroke'], axis=1)
     
     # get input for percentials

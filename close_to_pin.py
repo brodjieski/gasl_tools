@@ -4,17 +4,9 @@ from functools import reduce
 from datetime import datetime
 import math
 import glob
+from utils import read_csv_files, convert_time_to_hundredths
 
-# Function to read CSV files and concatenate them into a single DataFrame
-def read_csv_files(file_path_pattern):
-    # Use glob to find all files matching the pattern
-    files = glob.glob(file_path_pattern)
-    # Read all files and concatenate them into a single DataFrame
-    df_list = [pd.read_csv(file) for file in files]
-    combined_df = pd.concat(df_list, ignore_index=True)
-    return combined_df
-
-# Function to convert hundredths of a second to MM:SS.hh format
+# Modified version of convert_hundredths_to_time that returns empty string for positive differences
 def convert_hundredths_to_time(hundredths):
     negative = False
     if hundredths < 0:
@@ -35,23 +27,6 @@ def convert_hundredths_to_time(hundredths):
             return f"-{minutes:02}:{seconds:02}.{hundredths:02}"
         else:
             return f""
-
-def convert_time_to_hundredths(time):
-    if not isinstance(time, str):
-        return 0
-    if ":" not in time:
-        time = f'00:{time}'
-    minutes = int(time.split(":")[0])
-    seconds_with_hundredths = time.split(":")[1]
-    
-    try:
-        seconds = int(int(seconds_with_hundredths.split('.')[0]) + (minutes * 60))
-    except:
-        print(time)
-    hundredths = int(seconds_with_hundredths.split('.')[1])
-    
-    total_hundredths = int((hundredths + (seconds * 100)))
-    return total_hundredths
 
 def clean_up_events(row):
     if row['qualified_for'] == "Gold" or row['qualified_for'] == "Silver":
@@ -106,14 +81,22 @@ def main():
 
     # Read the CSV file
     best_times = read_csv_files(options.file)
-    best_times = best_times.assign(Event_name = best_times.AgeGroup.astype(str) + '_' + \
-        best_times.Event.str.split(' ',n=1, expand=True)[0] + '_' + best_times.Event.str.split(' ',n=1, expand=True)[1])
-    best_times = best_times.drop(['AgeGroup', 'Event', 'Age', 'Date', 'SwimMeet'], axis=1)
+    # Create event names from AgeGroup and Event fields
+    best_times = best_times.assign(
+        distance=best_times.Event.str.split(' ',n=1, expand=True)[0],
+        stroke=best_times.Event.str.split(' ',n=1, expand=True)[1],
+        age_group=best_times.AgeGroup.astype(str)
+    )
+    # Use our utility to create the Event_name field
+    from utils import add_event_names_column
+    best_times = add_event_names_column(best_times)
+    best_times = best_times.drop(['AgeGroup', 'Event', 'Age', 'Date', 'SwimMeet', 'age_group', 'distance', 'stroke'], axis=1)
 
     # Get the current standards, generate event_names
     current_standards = read_csv_files('./current_standards.csv')
-    current_standards = current_standards.assign(Event_name = current_standards.age_group.astype(str) + '_' + \
-        current_standards.distance.astype(str) + '_' + current_standards.stroke.astype(str))
+    # Use our utility to create event names
+    from utils import add_event_names_column
+    current_standards = add_event_names_column(current_standards)
     current_standards = current_standards.drop(['age_group', 'distance', 'stroke','gold_s', 'silver_s'], axis=1)
 
     best_times_with_standards = pd.merge(best_times, current_standards, on='Event_name')
