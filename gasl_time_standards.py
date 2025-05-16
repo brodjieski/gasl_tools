@@ -6,6 +6,115 @@ import glob
 import hashlib
 from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, create_event_name, add_event_names_column
 
+# Function to read CSV files and concatenate them into a single DataFrame
+def read_csv_files(file_path_pattern):
+    # Use glob to find all files matching the pattern
+    files = glob.glob(file_path_pattern)
+    # Read all files and concatenate them into a single DataFrame
+    df_list = [pd.read_csv(file) for file in files]
+    combined_df = pd.concat(df_list, ignore_index=True)
+    return combined_df
+
+# Function to convert hundredths of a second to MM:SS.hh format
+def convert_hundredths_to_time(hundredths):
+    negative = False
+    if hundredths < 0:
+        negative = True
+        hundredths = abs(hundredths)
+    total_seconds = hundredths / 100.0
+    minutes = int(total_seconds // 60)
+    hours = int(minutes // 60)
+    seconds = int(total_seconds % 60)
+    hundredths = int((total_seconds - minutes * 60 - seconds) * 100)
+    if hours > 0:
+        if negative:
+             return f"-{hours:02}:{int(minutes % 60)}:{seconds:02}"
+        else:
+            return f"{hours:02}:{int(minutes % 60)}:{seconds:02}"
+    else:
+        if negative:
+            return f"-{minutes:02}:{seconds:02}.{hundredths:02}"
+        else:
+            return f"{minutes:02}:{seconds:02}.{hundredths:02}"
+
+def gasl_event_id(event):
+    event_map = {
+        "Boys 10 & Under_100_Individual Medley" : 4,
+        "Boys 11-12_50_Backstroke" : 30,
+        "Boys 11-12_50_Breaststroke" : 40,
+        "Boys 11-12_50_Butterfly" : 50,
+        "Boys 11-12_50_Freestyle" : 18,
+        "Boys 11-12_100_Individual Medley" : 6,
+        "Boys 13-14_50_Backstroke" : 32,
+        "Boys 13-14_50_Breaststroke" : 42,
+        "Boys 13-14_50_Butterfly" : 52,
+        "Boys 13-14_50_Freestyle" : 20,
+        "Boys 13-14_100_Individual Medley" : 8,
+        "Boys 6 & Under_25_Backstroke" : 24,
+        "Boys 6 & Under_25_Freestyle" : 12,
+        "Boys 7-8_25_Backstroke" : 26,
+        "Boys 7-8_25_Freestyle" : 14,
+        "Boys 8 & Under_25_Breaststroke" : 36,
+        "Boys 8 & Under_25_Butterfly" : 46,
+        "Boys 9-10_25_Backstroke" : 28,
+        "Boys 9-10_25_Breaststroke" : 38,
+        "Boys 9-10_25_Butterfly" : 48,
+        "Boys 9-10_50_Freestyle" : 16,
+        "Girls 10 & Under_100_Individual Medley" : 5,
+        "Girls 11-12_50_Backstroke" : 31,
+        "Girls 11-12_50_Breaststroke" : 41,
+        "Girls 11-12_50_Butterfly" : 51,
+        "Girls 11-12_50_Freestyle" : 19,
+        "Girls 11-12_100_Individual Medley" : 7,
+        "Girls 13-14_50_Backstroke" : 33,
+        "Girls 13-14_50_Breaststroke" : 43,
+        "Girls 13-14_50_Butterfly" : 53,
+        "Girls 13-14_50_Freestyle" : 21,
+        "Girls 13-14_100_Individual Medley" : 9,
+        "Girls 6 & Under_25_Backstroke" : 25,
+        "Girls 6 & Under_25_Freestyle" : 13,
+        "Girls 7-8_25_Backstroke" : 27,
+        "Girls 7-8_25_Freestyle" : 15,
+        "Girls 8 & Under_25_Breaststroke" : 37,
+        "Girls 8 & Under_25_Butterfly" : 47,
+        "Girls 9-10_25_Backstroke" : 29,
+        "Girls 9-10_25_Breaststroke" : 39,
+        "Girls 9-10_25_Butterfly" : 49,
+        "Girls 9-10_50_Freestyle" : 17,
+        "Men 15-18_50_Backstroke" : 34,
+        "Men 15-18_50_Breaststroke" : 44,
+        "Men 15-18_50_Butterfly" : 54,
+        "Men 15-18_50_Freestyle" : 22,
+        "Men 15-18_100_Individual Medley" : 10,
+        "Women 15-18_50_Backstroke" : 35,
+        "Women 15-18_50_Breaststroke" : 45,
+        "Women 15-18_50_Butterfly" : 55,
+        "Women 15-18_50_Freestyle" : 23,
+        "Women 15-18_100_Individual Medley" : 11
+    }
+
+    if event in event_map:
+        return event_map[event]
+    else:
+        return 0
+
+def convert_time_to_hundredths(time):
+    if not isinstance(time, str):
+        return 0
+    if ":" not in time:
+        time = f'00:{time}'
+    minutes = int(time.split(":")[0])
+    seconds_with_hundredths = time.split(":")[1]
+    
+    try:
+        seconds = int(int(seconds_with_hundredths.split('.')[0]) + (minutes * 60))
+    except:
+        print(time)
+    hundredths = int(seconds_with_hundredths.split('.')[1])
+    
+    total_hundredths = int((hundredths + (seconds * 100)))
+    return total_hundredths
+
 # Function to get the 90th percentile threshold and count of values meeting/exceeding the threshold for each unique event
 def get_percentile_summary(df, standard, pct):
     # Group by 'age_group', 'distance', and 'stroke' to create unique events
@@ -13,6 +122,7 @@ def get_percentile_summary(df, standard, pct):
     # print(df.columns.tolist())
     # Lists to store the results
     event_names = []
+    event_ids = []
     thresholds = []
     thresholds_meters = []
     counts = []
@@ -32,9 +142,11 @@ def get_percentile_summary(df, standard, pct):
         
         # Create the event name
         event_name = f"{name[0]}_{name[1]}_{name[2]}"
+        event_id = gasl_event_id(event_name)
         
         # Store the results
         event_names.append(event_name)
+        event_ids.append(event_id)
         thresholds.append(threshold)
         thresholds_meters.append(convert_hundredths_to_time(threshold_value * 1.11))
         counts.append(count)
@@ -42,11 +154,69 @@ def get_percentile_summary(df, standard, pct):
     # Create a summary DataFrame
     summary_df = pd.DataFrame({
         'Event_name': event_names,
+        'GASL_Event_ID': event_ids,
         f'new_{standard}_y': thresholds,
         f'new_{standard}_s' : thresholds_meters
     })
-    
     return summary_df
+
+def get_current_percentile_summary(df, standard, current_times):
+    # Group by 'age_group', 'distance', and 'stroke' to create unique events
+    grouped = df.groupby(['age_group', 'distance', 'stroke'])
+    # print(df.columns.tolist())
+    # Lists to store the results
+    event_names = []
+    current_gold_times = []
+    current_silver_times = []
+    current_gold_percentile = []
+    current_silver_percentile = []
+    thresholds = []
+    thresholds_meters = []
+    counts = []
+    
+    # print(current_times)
+    # Process each group
+    for name, group in grouped:
+        
+        # Calculate the 90th percentile threshold
+        # threshold_value = group['converted_hundredths'].quantile(.15)
+        # print(threshold_value)
+        # Convert the threshold value to MM:SS.hh format
+        # threshold = convert_hundredths_to_time(threshold_value)
+        # # Count the number of entries meeting or exceeding the threshold
+        # count = (group['converted_hundredths'] >= threshold_value).sum()
+        
+        # Create the event name
+        event_name = f"{name[0]}_{name[1]}_{name[2]}"
+        gold_time = current_times.loc[current_times['Event_name'] == event_name, 'gold_y'].values[0]
+        gold_time_hundreths = convert_time_to_hundredths(gold_time)
+
+        # gold_percentile = group['converted_hundredths'].quantile(gold_time_hundreths/100)
+        gold_percentile = (group['converted_hundredths'] < gold_time_hundreths).mean() * 100
+        
+        silver_time = current_times.loc[current_times['Event_name'] == event_name, 'silver_y'].values[0]
+        silver_time_hundreths = convert_time_to_hundredths(silver_time)
+        silver_percentile = (group['converted_hundredths'] < silver_time_hundreths).mean() * 100
+
+
+        # Store the results
+        event_names.append(event_name)
+        current_gold_times.append(gold_time_hundreths)
+        current_gold_percentile.append(gold_percentile)
+        current_silver_times.append(silver_time_hundreths)
+        current_silver_percentile.append(silver_percentile)
+        # thresholds.append(threshold)
+    
+    # Create a summary DataFrame
+    summary_df = pd.DataFrame({
+        'Event_name': event_names,
+        'current_gold_time': current_gold_times,
+        'current_gold_percentile': current_gold_percentile,
+        'current_silver_time': current_silver_times,
+        'current_silver_percentile': current_silver_percentile
+    })
+    
+    summary_df.to_csv(f'current_percential_analysis.csv', index=False)
 
 def dedup_entries(df):
     # Define meet ranking order using pd.Categorical
@@ -67,6 +237,26 @@ def dedup_entries(df):
     
     return df_final
 def add_event_names(df):
+    # Group by 'age_group', 'distance', and 'stroke' to create unique events
+    grouped = df.groupby(['age_group', 'distance', 'stroke'])
+
+    # Lists to store the results
+    event_names = []
+
+    for name, group in grouped:
+        # Create the event name
+        event_name = f"{name[0]}_{name[1]}_{name[2]}"
+
+        # Store the results
+        event_names.append(event_name)
+
+    # Create a summary DataFrame
+    summary_df = pd.DataFrame({
+        'Event_name': event_names,
+    })
+    df['Event_name'] = event_names
+
+    return 
     # Use the utility function to add event names to the DataFrame
     add_event_names_column(df)
     return
@@ -123,7 +313,7 @@ def get_estimated_meet_duration(df, season, proposed_times, heat_time, event_del
         _silver_heats = math.ceil(silver_count/6)
         _bronze_heats = math.ceil(bronze_count/6)
 
-        # print(f'{season} GOLD: Number of heats: {_gold_heats} for {event_name}')
+        print(f'{season} GOLD: Number of heats: {_gold_heats} for {event_name}')
         # print(f'{season} SILVER: Number of heats: {_silver_heats} for {event_name}')
         # print(f'{season} BRONZE: Number of heats: {_bronze_heats} for {event_name}')
 
@@ -236,7 +426,7 @@ def  get_qualifiers_summary(df, proposed_times, current_times, heat_time, event_
     number_of_bronze_athletes = (cleaned_up_entries_sorted['qualified_meet'] == "BRONZE").sum()
 
     times_df=get_estimated_meet_duration(cleaned_up_entries, _dt.year, proposed_times, heat_time, event_time)
-
+    times_df.to_csv(f'estimated_meet_times_{_dt.year}.csv', index=False)
     gold_duration = times_df[f'gold_est_duration-{_dt.year}'].sum() + 12000
     silver_duration = times_df[f'silver_est_duration-{_dt.year}'].sum() + 24000
     bronze_duration = times_df[f'bronze_est_duration-{_dt.year}'].sum() + 24000
@@ -308,8 +498,8 @@ def main():
     current_standards = current_standards.drop(['age_group', 'distance', 'stroke'], axis=1)
     
     # get input for percentials
-    gold_pct = float(input('Enter percentile for Gold Meet Standard (default: .20): ').strip() or ".2")
-    silver_pct = float(input('Enter percentile for Silver Meet Standard (default: .60): ').strip() or ".6")
+    gold_pct = float(input('Enter percentile for Gold Meet Standard (default: .15): ').strip() or ".15")
+    silver_pct = float(input('Enter percentile for Silver Meet Standard (default: .55): ').strip() or ".55")
     heat_time = int(input('To estimate meet length, enter the number of seconds between heats (default: 15): ').strip() or "15")
     event_time = int(input('To estimate meet length, enter the number of seconds between events (default: 30): ').strip() or "30")
 
@@ -324,18 +514,23 @@ def main():
         summary_df = get_percentile_summary(df, standard, pct)
         summary.append(summary_df)
 
+    
     combined=reduce(lambda x, y: pd.merge(x, y, on = 'Event_name'), summary)
-
+    
     add_current = combined.merge(current_standards, on = "Event_name")
     proposed_with_differences = get_new_time_diffs(add_current)
 
+    # show current percentile of current time standards for each event
+    get_current_percentile_summary(df, standard, add_current)
+    # df.to_csv('all_swims.csv', index=False)
     # remove any proposed times for silver 15-18 events
     proposed_with_differences = clean_up_events(proposed_with_differences)
 
     # column order
-    col_order = ["Event_name", "gold_y", "new_gold_y", "gold_diff_y", "gold_s", "new_gold_s", "gold_diff_s", "silver_y", "new_silver_y", "silver_diff_y", "silver_s", "new_silver_s", "silver_diff_s"]
+    col_order = ["GASL_Event_ID_x", "Event_name", "gold_y", "new_gold_y", "gold_diff_y", "gold_s", "new_gold_s", "gold_diff_s", "silver_y", "new_silver_y", "silver_diff_y", "silver_s", "new_silver_s", "silver_diff_s"]
     proposed_with_differences = proposed_with_differences[col_order]
-    proposed_with_differences.rename(columns={"Event_name" : "Event", 
+    proposed_with_differences.rename(columns={ "GASL_Event_ID_x" : "Event_ID",
+        "Event_name" : "Event", 
         "gold_y" : "Current Gold Time (yards)", 
         "new_gold_y" : "Proposed Gold Time (yards)", 
         "gold_diff_y" : "Gold delta (yards)", 
@@ -348,8 +543,46 @@ def main():
         "silver_s" : "Current Silver Time (meters)", 
         "new_silver_s" : "Proposed Silver Time (meters)", 
         "silver_diff_s" : "Silver delta (meters)"}, inplace=True)
-
+    # print(proposed_with_differences.columns.tolist())
+    proposed_with_differences.sort_values(by=['Event_ID'], inplace=True)
     proposed_with_differences.to_csv(f'proposed_new_standards_{gold_pct}_{silver_pct}.csv', index=False)
+
+    # attempt to write out keystrokes to use in applescript
+    selected_columns = ['Proposed Gold Time (yards)', 'Proposed Gold Time (meters)', 'Proposed Silver Time (yards)', 'Proposed Silver Time (meters)' ]
+
+    # Write output
+    with open('enter_time_standards.applescript', 'w') as f:
+        f.write('tell application "Safari"\n')
+        f.write('activate\n')
+        f.write('delay 0.2\n')
+        f.write('tell application "System Events"\n')
+        for _, row in proposed_with_differences.iterrows():
+            for col in selected_columns:
+                value = row[col]
+                if pd.isna(value) or str(value).strip() == "":
+                    f.write('key code 51\n')
+                    f.write('delay 0.2\n')
+                    f.write('keystroke {tab}\n')
+                    f.write('delay 0.2\n')
+                else:
+                    f.write('key code 51\n')
+                    f.write('delay 0.2\n')
+                    f.write(f'keystroke "{value}"\n')
+                    f.write('delay 0.2\n')
+                    f.write('keystroke {tab}\n')
+                    f.write('delay 0.2\n')
+            f.write('key code 51\n')
+            f.write('delay 0.2\n')
+            f.write('keystroke {tab}\n')
+            f.write('delay 0.2\n')
+            f.write('key code 51\n')
+            f.write('delay 0.2\n')
+            f.write('keystroke {tab}\n')
+            f.write('delay 0.2\n')
+            f.write('key code 51\n')
+            f.write('delay 0.2\n')
+        f.write('end tell\n')
+        f.write('end tell\n')
 
     print(f'\n\nBased on the newly calculated time standards with the top {gold_pct:.0%} for Gold and top {silver_pct:.0%} for silver, lets estimate how long each meet would take (using last season data):')
     # look at all of the gasl times, print out summary based on current season
@@ -364,7 +597,6 @@ def main():
             qualifiers.to_csv(f'{season}-qualifiers.csv', index=False)
     
     print(f'\nCalulated times file written to: ./proposed_new_standards_{gold_pct}_{silver_pct}.csv')
-
 # Main execution
 if __name__ == "__main__":
     main()
