@@ -5,6 +5,7 @@ werkzeug>=2.0.0
 openpyxl>=3.0.0
 flask-limiter>=2.0
 reportlab>=3.6.0
+gunicorn>=23.0.0
 
 # Optional security enhancement (requires system libmagic)
 # python-magic>=0.4.0
