@@ -52,8 +52,8 @@
                     understanding their competitive positioning.
                 </p>
                 <ul>
-                    <li><strong>Time Standards Calculator:</strong> Data-driven approach to setting qualification times</li>
                     <li><strong>Close to Pin Analysis:</strong> Individual swimmer progress tracking and goal setting</li>
+                    <li><strong>Time Standards Calculator:</strong> Data-driven approach to setting qualification times</li>
                 </ul>
                 
                 <div class="current-standards-section">
@@ -62,6 +62,7 @@
                     <button id="show-standards-btn" class="standards-button">
                         📋 View Current Standards
                     </button>
+                    <p id="standards-info" class="standards-date-info"><strong>Current Standards as of</strong> <span id="standards-date">Loading...</span></p>
                 </div>
             </div>
 
@@ -98,6 +99,9 @@
         const standardsSearch = document.getElementById('standards-search');
         
         let currentStandards = null;
+
+        // Load standards info on page load
+        loadStandardsInfo();
 
         // Show standards modal
         showStandardsBtn.addEventListener('click', async () => {
@@ -226,6 +230,31 @@
                 standardsModal.style.display = 'none';
             }
         });
+
+        // Load standards modification date
+        async function loadStandardsInfo() {
+            try {
+                const response = await fetch('/standards-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    const dateElement = document.getElementById('standards-date');
+                    if (dateElement) {
+                        dateElement.textContent = data.last_modified;
+                    }
+                } else {
+                    const dateElement = document.getElementById('standards-date');
+                    if (dateElement) {
+                        dateElement.textContent = 'Unknown';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load standards info:', error);
+                const dateElement = document.getElementById('standards-date');
+                if (dateElement) {
+                    dateElement.textContent = 'Unknown';
+                }
+            }
+        }
     </script>
 </body>
 </html>

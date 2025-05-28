@@ -1,5 +1,6 @@
 *.csv
 !current_standards.csv
+CLAUDE.md
 *.applescript
 *.pyc
 .DS_Store

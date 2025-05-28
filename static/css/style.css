@@ -958,3 +958,11 @@ footer {
         margin-left: 10px;
     }
 }
+
+/* Standards date info styling */
+.standards-date-info {
+    font-size: 0.95rem;
+    color: #6c757d;
+    margin: 10px 0;
+    font-style: italic;
+}
