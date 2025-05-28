@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GASL Tools</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏊‍♂️ GASL Tools</h1>
+            <p>Greater Annapolis Swimming League analysis and management tools</p>
+        </header>
+
+        <main>
+            <div class="tools-grid">
+
+                <div class="tool-card">
+                    <div class="tool-icon">🎯</div>
+                    <h2>Close to Pin Analysis</h2>
+                    <p>Analyze swimmer best times against current standards to identify which championship meet they qualify for and how close they are to the next level.</p>
+                    <div class="tool-features">
+                        <span class="feature">Best Times Analysis</span>
+                        <span class="feature">Qualification Status</span>
+                        <span class="feature">Time Gaps</span>
+                    </div>
+                    <a href="{{ url_for('close_to_pin') }}" class="tool-button">
+                        Launch Analysis
+                    </a>
+                </div>
+                <div class="tool-card">
+                    <div class="tool-icon">📊</div>
+                    <h2>Time Standards Calculator</h2>
+                    <p>Calculate new swimming time standards based on historical performance data. Analyze current standards, estimate meet durations, and generate qualification thresholds.</p>
+                    <div class="tool-features">
+                        <span class="feature">Calculate Standards</span>
+                        <span class="feature">Analyze Performance</span>
+                        <span class="feature">Estimate Duration</span>
+                    </div>
+                    <a href="{{ url_for('time_standards') }}" class="tool-button">
+                        Launch Calculator
+                    </a>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <h3>About GASL Tools</h3>
+                <p>
+                    These tools are designed to help the Greater Annapolis Swimming League (GASL) analyze 
+                    swimming performance data, set appropriate time standards, and support swimmers in 
+                    understanding their competitive positioning.
+                </p>
+                <ul>
+                    <li><strong>Time Standards Calculator:</strong> Data-driven approach to setting qualification times</li>
+                    <li><strong>Close to Pin Analysis:</strong> Individual swimmer progress tracking and goal setting</li>
+                </ul>
+                
+                <div class="current-standards-section">
+                    <h4>Current Time Standards</h4>
+                    <p>View the current GASL time standards for all age groups and events.</p>
+                    <button id="show-standards-btn" class="standards-button">
+                        📋 View Current Standards
+                    </button>
+                </div>
+            </div>
+
+            <!-- Standards Modal -->
+            <div id="standards-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>📋 Current GASL Time Standards</h3>
+                        <span class="close-modal" id="close-modal">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <div class="search-container">
+                            <input type="text" id="standards-search" placeholder="🔍 Search events..." class="search-input">
+                        </div>
+                        <div id="standards-content">
+                            <div class="loading-spinner">Loading standards...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Greater Annapolis Swim League</p>
+        </footer>
+    </div>
+
+    <script>
+        // DOM elements
+        const showStandardsBtn = document.getElementById('show-standards-btn');
+        const standardsModal = document.getElementById('standards-modal');
+        const closeModal = document.getElementById('close-modal');
+        const standardsContent = document.getElementById('standards-content');
+        const standardsSearch = document.getElementById('standards-search');
+        
+        let currentStandards = null;
+
+        // Show standards modal
+        showStandardsBtn.addEventListener('click', async () => {
+            standardsModal.style.display = 'flex';
+            
+            if (!currentStandards) {
+                await loadStandards();
+            }
+        });
+
+        // Close modal
+        closeModal.addEventListener('click', () => {
+            standardsModal.style.display = 'none';
+        });
+
+        // Close modal when clicking outside
+        window.addEventListener('click', (e) => {
+            if (e.target === standardsModal) {
+                standardsModal.style.display = 'none';
+            }
+        });
+
+        // Load standards data
+        async function loadStandards() {
+            try {
+                standardsContent.innerHTML = '<div class="loading-spinner">Loading standards...</div>';
+                
+                const response = await fetch('/current-standards');
+                if (!response.ok) {
+                    throw new Error('Failed to load standards');
+                }
+                
+                const data = await response.json();
+                currentStandards = data.standards;
+                displayStandards(currentStandards, data.last_modified);
+                
+            } catch (error) {
+                console.error('Error loading standards:', error);
+                standardsContent.innerHTML = `
+                    <div class="error-message">
+                        <p>Failed to load current standards.</p>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Display standards table
+        function displayStandards(standards, lastModified) {
+            // Update modal header with timestamp
+            const modalHeader = document.querySelector('.modal-header h3');
+            if (modalHeader && lastModified) {
+                modalHeader.innerHTML = `
+                    📋 Current GASL Time Standards
+                    <span class="timestamp">Last updated: ${lastModified}</span>
+                `;
+            }
+            let html = `
+                <div class="standards-table-container">
+                    <table class="standards-table">
+                        <thead>
+                            <tr>
+                                <th>Age Group</th>
+                                <th>Distance</th>
+                                <th>Stroke</th>
+                                <th>Gold (Yards)</th>
+                                <th>Silver (Yards)</th>
+                                <th>Gold (Meters)</th>
+                                <th>Silver (Meters)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="standards-table-body">
+            `;
+            
+            standards.forEach(standard => {
+                html += `
+                    <tr>
+                        <td>${standard.age_group || ''}</td>
+                        <td>${standard.distance || ''}</td>
+                        <td>${standard.stroke || ''}</td>
+                        <td class="time-cell">${standard.gold_y || ''}</td>
+                        <td class="time-cell">${standard.silver_y || ''}</td>
+                        <td class="time-cell">${standard.gold_s || ''}</td>
+                        <td class="time-cell">${standard.silver_s || ''}</td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            standardsContent.innerHTML = html;
+            setupStandardsSearch();
+        }
+
+        // Setup search functionality
+        function setupStandardsSearch() {
+            standardsSearch.addEventListener('input', function(e) {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                const tbody = document.getElementById('standards-table-body');
+                const rows = tbody.querySelectorAll('tr');
+                
+                rows.forEach(row => {
+                    const cells = row.querySelectorAll('td');
+                    let rowText = '';
+                    
+                    cells.forEach(cell => {
+                        rowText += cell.textContent.toLowerCase() + ' ';
+                    });
+                    
+                    if (searchTerm === '' || rowText.includes(searchTerm)) {
+                        row.style.display = '';
+                    } else {
+                        row.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // Escape key to close modal
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && standardsModal.style.display === 'flex') {
+                standardsModal.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

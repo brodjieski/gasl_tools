@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Close to Pin Analysis - GASL Tools</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
+            </div>
+            <h1>🎯 Close to Pin Analysis</h1>
+            <p>Analyze swimmer best times against the current time standards to determine qualification status for medal meets.</p>
+        </header>
+
+        <main>
+            <section class="intro-section">
+                <div class="intro-content">
+                    <h2>📋 About Close to Pin Analysis</h2>
+                    <p>This report can help coaches determine strategies to help swimmers achieve their goals of qualifying for end of season meets. Using the "Best Times" report from Swimtopia, this tool will give a status for each swimmer on your team based on which meet they currently qualify for. A PDF report is available to send to coaches or swimmers and parents to review.</p>
+                </div>
+            </section>
+            
+            <form id="close-to-pin-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h2>📋 File Upload</h2>
+                    
+                    <div class="form-group">
+                        <label for="best_times_file">📈 Best Times File (CSV):</label>
+                        <input type="file" id="best_times_file" name="best_times_file" 
+                               accept=".csv" required>
+                        <small>Upload swimmer best times file exported from Swimtopia (Reports -> Best Times)</small>
+                    </div>
+                    
+                    <div class="info-note">
+                        <p id="standards-info">📊 <strong>Current Standards as of</strong> <span id="standards-date">Loading...</span></p>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="submit-btn" class="btn-primary">
+                        <span class="btn-text">Analyze Times</span>
+                        <span class="loading-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                            Processing...
+                        </span>
+                    </button>
+                    <button type="reset" class="btn-secondary">Reset Form</button>
+                </div>
+            </form>
+
+            <div id="results-section" style="display: none;">
+                <h2>Results</h2>
+                <div class="download-buttons">
+                    <button onclick="downloadResults('csv')" class="download-btn">
+                        📁 Download CSV
+                    </button>
+                    <button onclick="downloadResults('xlsx')" class="download-btn">
+                        📊 Download Excel
+                    </button>
+                    <button onclick="downloadResults('pdf')" class="download-btn">
+                        📄 Download PDF Report
+                    </button>
+                </div>
+                <div id="results-content"></div>
+            </div>
+
+            <div id="error-section" style="display: none;">
+                <h2>Error</h2>
+                <div id="error-content" class="error-message"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Greater Annapolis Swim League</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/close-to-pin.js') }}"></script>
+</body>
+</html>

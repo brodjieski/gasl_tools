@@ -42,17 +42,26 @@ def convert_time_to_hundredths(time):
         return 0
     if ":" not in time:
         time = f'00:{time}'
-    minutes = int(time.split(":")[0])
-    seconds_with_hundredths = time.split(":")[1]
     
     try:
-        seconds = int(int(seconds_with_hundredths.split('.')[0]) + (minutes * 60))
-    except:
-        print(time)
-    hundredths = int(seconds_with_hundredths.split('.')[1])
-    
-    total_hundredths = int((hundredths + (seconds * 100)))
-    return total_hundredths
+        minutes = int(time.split(":")[0])
+        seconds_with_hundredths = time.split(":")[1]
+        
+        # Check if there's a decimal point
+        if '.' in seconds_with_hundredths:
+            seconds_part = int(seconds_with_hundredths.split('.')[0])
+            hundredths_part = int(seconds_with_hundredths.split('.')[1])
+        else:
+            # Handle case where there's no decimal point (like "30" or "01:30")
+            seconds_part = int(seconds_with_hundredths)
+            hundredths_part = 0
+        
+        seconds = int(seconds_part + (minutes * 60))
+        total_hundredths = int((hundredths_part + (seconds * 100)))
+        return total_hundredths
+    except (ValueError, IndexError) as e:
+        print(f"Error parsing time '{time}': {e}")
+        return 0
 
 
 # Generate standardized event names from age group, distance, and stroke
