@@ -2,7 +2,7 @@ import pandas as pd
 from functools import reduce
 from datetime import datetime
 import math
-from utils import read_csv_files, convert_time_to_hundredths, add_event_names_column
+from utils import read_csv_files, convert_time_to_hundredths, add_event_names_column, read_csv_with_metadata
 
 
 class CloseToPinService:
@@ -105,7 +105,7 @@ class CloseToPinService:
         best_times = best_times.drop(['AgeGroup', 'Event', 'Age', 'Date', 'SwimMeet', 'age_group', 'distance', 'stroke'], axis=1)
 
         # Get the current standards, generate event_names
-        current_standards = pd.read_csv(current_standards_file)
+        current_standards = read_csv_with_metadata(current_standards_file)
         # Use our utility to create event names
         current_standards = add_event_names_column(current_standards)
         current_standards = current_standards.drop(['age_group', 'distance', 'stroke', 'gold_s', 'silver_s'], axis=1)

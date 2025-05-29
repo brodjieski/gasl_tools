@@ -3,7 +3,7 @@ import hashlib
 import math
 from datetime import datetime
 from functools import reduce
-from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, add_event_names_column
+from utils import read_csv_files, convert_hundredths_to_time, convert_time_to_hundredths, add_event_names_column, read_csv_with_metadata
 
 
 class TimeStandardsService:
@@ -394,7 +394,7 @@ class TimeStandardsService:
         df = self.prepare_data(data_file_pattern)
         
         # Get current standards
-        current_standards = pd.read_csv(current_standards_file)
+        current_standards = read_csv_with_metadata(current_standards_file)
         current_standards = add_event_names_column(current_standards)
         current_standards = current_standards.drop(['age_group', 'distance', 'stroke'], axis=1)
         

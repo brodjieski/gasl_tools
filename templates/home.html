@@ -52,17 +52,17 @@
                     understanding their competitive positioning.
                 </p>
                 <ul>
-                    <li><strong>Close to Pin Analysis:</strong> Individual swimmer progress tracking and goal setting</li>
                     <li><strong>Time Standards Calculator:</strong> Data-driven approach to setting qualification times</li>
+                    <li><strong>Close to Pin Analysis:</strong> Individual swimmer progress tracking and goal setting</li>
                 </ul>
                 
                 <div class="current-standards-section">
                     <h4>Current Time Standards</h4>
                     <p>View the current GASL time standards for all age groups and events.</p>
+                    <p id="standards-info" class="standards-date-info">📊 <strong>Current Standards Adopted</strong> <span id="standards-date">Loading...</span></p>
                     <button id="show-standards-btn" class="standards-button">
                         📋 View Current Standards
                     </button>
-                    <p id="standards-info" class="standards-date-info"><strong>Current Standards as of</strong> <span id="standards-date">Loading...</span></p>
                 </div>
             </div>
 
@@ -129,14 +129,26 @@
             try {
                 standardsContent.innerHTML = '<div class="loading-spinner">Loading standards...</div>';
                 
-                const response = await fetch('/current-standards');
-                if (!response.ok) {
+                // Load both standards data and adoption date
+                const [standardsResponse, infoResponse] = await Promise.all([
+                    fetch('/current-standards'),
+                    fetch('/standards-info')
+                ]);
+                
+                if (!standardsResponse.ok) {
                     throw new Error('Failed to load standards');
                 }
                 
-                const data = await response.json();
-                currentStandards = data.standards;
-                displayStandards(currentStandards, data.last_modified);
+                const standardsData = await standardsResponse.json();
+                currentStandards = standardsData.standards;
+                
+                let adoptedDate = null;
+                if (infoResponse.ok) {
+                    const infoData = await infoResponse.json();
+                    adoptedDate = infoData.last_modified;
+                }
+                
+                displayStandards(currentStandards, adoptedDate);
                 
             } catch (error) {
                 console.error('Error loading standards:', error);
@@ -150,13 +162,13 @@
         }
 
         // Display standards table
-        function displayStandards(standards, lastModified) {
-            // Update modal header with timestamp
+        function displayStandards(standards, adoptedDate) {
+            // Update modal header with adoption date
             const modalHeader = document.querySelector('.modal-header h3');
-            if (modalHeader && lastModified) {
+            if (modalHeader && adoptedDate) {
                 modalHeader.innerHTML = `
                     📋 Current GASL Time Standards
-                    <span class="timestamp">Last updated: ${lastModified}</span>
+                    <span class="timestamp">Adopted: ${adoptedDate}</span>
                 `;
             }
             let html = `

@@ -288,19 +288,50 @@ def get_standards_info():
             if not os.path.exists(standards_filepath):
                 return jsonify({'error': 'Current standards file not found'}), 404
         
-        # Get file modification time
-        import datetime
-        modification_time = os.path.getmtime(standards_filepath)
-        last_modified = datetime.datetime.fromtimestamp(modification_time)
+        # Try to read metadata from first line
+        adopted_date = extract_metadata_date(standards_filepath)
         
-        return jsonify({
-            'status': 'success',
-            'last_modified': last_modified.strftime('%B %d, %Y'),
-            'last_modified_iso': last_modified.isoformat()
-        })
+        if adopted_date:
+            return jsonify({
+                'status': 'success',
+                'last_modified': adopted_date,
+                'last_modified_iso': None  # Keep for compatibility but not used for metadata
+            })
+        else:
+            # Fallback to file modification time if no metadata found
+            import datetime
+            modification_time = os.path.getmtime(standards_filepath)
+            last_modified = datetime.datetime.fromtimestamp(modification_time)
+            
+            return jsonify({
+                'status': 'success',
+                'last_modified': last_modified.strftime('%B %d, %Y'),
+                'last_modified_iso': last_modified.isoformat()
+            })
     
     except Exception as e:
         return jsonify({'error': f'Failed to get standards info: {str(e)}'}), 500
+
+
+def extract_metadata_date(filepath):
+    """Extract adoption date from metadata line in standards file."""
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            first_line = f.readline().strip()
+            
+            # Check if first line is a metadata comment
+            if first_line.startswith('#'):
+                # Look for "Adopted:" pattern
+                import re
+                adopted_match = re.search(r'#\s*Adopted:\s*(.+)', first_line, re.IGNORECASE)
+                if adopted_match:
+                    return adopted_match.group(1).strip()
+        
+        return None
+    
+    except Exception as e:
+        print(f"Warning: Could not read metadata from {filepath}: {e}")
+        return None
 
 
 @app.route('/current-standards', methods=['GET'])
@@ -323,9 +354,9 @@ def get_current_standards():
         
         # Read and process standards
         import pandas as pd
-        from utils import add_event_names_column
+        from utils import add_event_names_column, read_csv_with_metadata
         
-        standards = pd.read_csv(standards_filepath)
+        standards = read_csv_with_metadata(standards_filepath)
         standards = add_event_names_column(standards)
         
         # Clean data for display
@@ -509,8 +540,8 @@ def analyze_current_standards():
             df = service.prepare_data(data_pattern)
             
             # Get current standards
-            from utils import add_event_names_column
-            current_standards = pd.read_csv(standards_filepath)
+            from utils import add_event_names_column, read_csv_with_metadata
+            current_standards = read_csv_with_metadata(standards_filepath)
             current_standards = add_event_names_column(current_standards)
             
             # Analyze current percentiles
@@ -1160,9 +1191,9 @@ def save_final_standards():
         # Convert accepted standards to the current_standards.csv format
         new_standards_df = convert_final_standards_to_format(accepted_standards)
         
-        # Save new standards
+        # Save new standards with metadata
         new_standards_path = os.path.join(os.getcwd(), 'current_standards_new.csv')
-        new_standards_df.to_csv(new_standards_path, index=False)
+        save_standards_with_metadata(new_standards_df, new_standards_path)
         
         # Log the changes
         log_standards_changes(accepted_standards, parameters)
@@ -1265,6 +1296,26 @@ def parse_event_fallback(event_info):
             break
     
     return age_group, distance, stroke
+
+
+def save_standards_with_metadata(standards_df, filepath):
+    """Save standards DataFrame to CSV with metadata header."""
+    try:
+        from datetime import datetime
+        
+        # Generate current date for metadata
+        current_date = datetime.now().strftime('%B %Y')
+        metadata_line = f"# Adopted: {current_date}\n"
+        
+        # Write metadata header and CSV data
+        with open(filepath, 'w', encoding='utf-8', newline='') as f:
+            f.write(metadata_line)
+            standards_df.to_csv(f, index=False)
+            
+    except Exception as e:
+        # Fallback to regular CSV save if metadata save fails
+        print(f"Warning: Failed to save with metadata, using regular save: {e}")
+        standards_df.to_csv(filepath, index=False)
 
 
 def log_standards_changes(standards_df, parameters):

@@ -4,6 +4,20 @@ from datetime import datetime
 import math
 
 
+def read_csv_with_metadata(filepath):
+    """Read CSV file, automatically skipping metadata line if present."""
+    skip_rows = 0
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            first_line = f.readline().strip()
+            if first_line.startswith('#'):
+                skip_rows = 1
+    except Exception:
+        pass  # If we can't read the first line, just proceed normally
+    
+    return pd.read_csv(filepath, skiprows=skip_rows)
+
+
 # Function to read CSV files and concatenate them into a single DataFrame
 def read_csv_files(file_path_pattern):
     # Use glob to find all files matching the pattern
