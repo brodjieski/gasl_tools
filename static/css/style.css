@@ -655,6 +655,8 @@ input[type="file"]::-webkit-file-upload-button:hover {
     border-bottom: 1px solid #e1e8ed;
     background: #f8f9fa;
     border-radius: 12px 12px 0 0;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .modal-header h3 {
@@ -686,6 +688,39 @@ input[type="file"]::-webkit-file-upload-button:hover {
 
 .close-modal:hover {
     color: #2c3e50;
+}
+
+.modal-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.export-button {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 2px 4px rgba(39, 174, 96, 0.2);
+}
+
+.export-button:hover {
+    background: #229954;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+}
+
+.export-button:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(39, 174, 96, 0.2);
 }
 
 .modal-body {

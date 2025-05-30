@@ -59,7 +59,7 @@
                 <div class="current-standards-section">
                     <h4>Current Time Standards</h4>
                     <p>View the current GASL time standards for all age groups and events.</p>
-                    <p id="standards-info" class="standards-date-info">📊 <strong>Current Standards Adopted</strong> <span id="standards-date">Loading...</span></p>
+                    <p id="standards-info" class="standards-date-info">📊 <strong>Current Standards as of</strong> <span id="standards-date">Loading...</span></p>
                     <button id="show-standards-btn" class="standards-button">
                         📋 View Current Standards
                     </button>
@@ -71,7 +71,12 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h3>📋 Current GASL Time Standards</h3>
-                        <span class="close-modal" id="close-modal">&times;</span>
+                        <div class="modal-actions">
+                            <button id="export-pdf-btn" class="export-button" title="Export to PDF">
+                                📄 Export PDF
+                            </button>
+                            <span class="close-modal" id="close-modal">&times;</span>
+                        </div>
                     </div>
                     <div class="modal-body">
                         <div class="search-container">
@@ -97,6 +102,7 @@
         const closeModal = document.getElementById('close-modal');
         const standardsContent = document.getElementById('standards-content');
         const standardsSearch = document.getElementById('standards-search');
+        const exportPdfBtn = document.getElementById('export-pdf-btn');
         
         let currentStandards = null;
 
@@ -122,6 +128,11 @@
             if (e.target === standardsModal) {
                 standardsModal.style.display = 'none';
             }
+        });
+
+        // Export to PDF
+        exportPdfBtn.addEventListener('click', () => {
+            window.open('/export-current-standards-pdf', '_blank');
         });
 
         // Load standards data

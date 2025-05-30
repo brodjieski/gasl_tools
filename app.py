@@ -313,6 +313,245 @@ def get_standards_info():
         return jsonify({'error': f'Failed to get standards info: {str(e)}'}), 500
 
 
+@app.route('/export-current-standards-pdf')
+@limiter.limit("10 per minute")
+def export_current_standards_pdf():
+    """Export current standards to PDF."""
+    try:
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter, landscape
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from io import BytesIO
+        import datetime
+        import pandas as pd
+        
+        # Read current standards
+        from utils import read_csv_with_metadata
+        df = read_csv_with_metadata('current_standards.csv')
+        
+        # Get adoption date
+        adoption_date = extract_metadata_date('current_standards.csv')
+        if not adoption_date:
+            import os
+            mtime = os.path.getmtime('current_standards.csv')
+            adoption_date = datetime.datetime.fromtimestamp(mtime).strftime('%B %Y')
+        
+        # Create PDF buffer
+        buffer = BytesIO()
+        
+        # Use standard portrait letter size
+        doc = SimpleDocTemplate(buffer, pagesize=letter, 
+                              rightMargin=0.5*inch, leftMargin=0.5*inch,
+                              topMargin=0.75*inch, bottomMargin=0.75*inch)
+        
+        # Build the document
+        elements = []
+        styles = getSampleStyleSheet()
+        
+        # Title
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            spaceAfter=4,
+            alignment=1,  # Center alignment
+            textColor=colors.HexColor('#2c3e50')
+        )
+        title = Paragraph("GASL Time Standards", title_style)
+        elements.append(title)
+        
+        # Subtitle with adoption date
+        subtitle_style = ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Normal'],
+            fontSize=8,
+            spaceAfter=8,
+            alignment=1,  # Center alignment
+            textColor=colors.HexColor('#7f8c8d')
+        )
+        subtitle = Paragraph(f"Adopted: {adoption_date}", subtitle_style)
+        elements.append(subtitle)
+        
+        # Function to extract age for sorting
+        def extract_age_order(age_group):
+            """Extract numeric age or assign order for age groups"""
+            age_str = str(age_group).lower()
+            
+            # Handle specific age ranges
+            if '8 & under' in age_str or '8&under' in age_str:
+                return 8
+            elif '9-10' in age_str:
+                return 9
+            elif '11-12' in age_str:
+                return 11
+            elif '13-14' in age_str:
+                return 13
+            elif '15-18' in age_str:
+                return 15
+            elif 'women' in age_str or 'men' in age_str:
+                return 19  # Adult category comes last
+            else:
+                # Try to extract first number found
+                import re
+                numbers = re.findall(r'\d+', age_str)
+                if numbers:
+                    return int(numbers[0])
+                else:
+                    return 999  # Unknown ages go to end
+        
+        # Add age ordering column
+        df['age_order'] = df['age_group'].apply(extract_age_order)
+        
+        # Separate data by gender and sort by age
+        girls_data = df[df['age_group'].str.contains('Girls|Women', case=False, na=False)].sort_values(['age_order', 'distance', 'stroke'])
+        boys_data = df[df['age_group'].str.contains('Boys|Men', case=False, na=False) & 
+                      ~df['age_group'].str.contains('Girls|Women', case=False, na=False)].sort_values(['age_order', 'distance', 'stroke'])
+        
+        def create_gender_table(data, title, title_color):
+            """Create a table for a specific gender group"""
+            table_data = []
+            
+            # Create multi-level headers
+            header_row1 = ['Event', '', '', 'Yards', '', 'Meters', '']
+            header_row2 = ['Age Group', 'Distance', 'Stroke', 'Gold', 'Silver', 'Gold', 'Silver']
+            
+            table_data.append(header_row1)
+            table_data.append(header_row2)
+            
+            # Add data rows
+            for _, row in data.iterrows():
+                def clean_value(val):
+                    """Convert value to string and handle NaN/None"""
+                    if pd.isna(val) or val is None or str(val).lower() == 'nan':
+                        return ''
+                    return str(val)
+                
+                table_data.append([
+                    clean_value(row.get('age_group', '')),
+                    clean_value(row.get('distance', '')),
+                    clean_value(row.get('stroke', '')),
+                    clean_value(row.get('gold_y', '')),
+                    clean_value(row.get('silver_y', '')),
+                    clean_value(row.get('gold_s', '')),
+                    clean_value(row.get('silver_s', ''))
+                ])
+            
+            # Create table
+            table = Table(table_data, repeatRows=2)
+            
+            # Table styling
+            table.setStyle(TableStyle([
+                # Main header row styling (row 0)
+                ('BACKGROUND', (0, 0), (2, 0), colors.HexColor('#4b80d6')),  # Age Group, Distance, Stroke
+                ('BACKGROUND', (3, 0), (4, 0), colors.HexColor('#4b80d6')),  # Yards columns
+                ('BACKGROUND', (5, 0), (6, 0), colors.HexColor('#4b80d6')),  # Meters columns
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 0), (-1, 0), 10),
+                ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+                ('SPAN', (0, 0), (2, 0)),
+                ('SPAN', (3, 0), (4, 0)),  # Span "Yards" across two columns
+                ('SPAN', (5, 0), (6, 0)),  # Span "Meters" across two columns
+                
+                # Sub-header row styling (row 1)
+                ('BACKGROUND', (0, 1), (2, 1), colors.HexColor('#4b80d6')),  # Age Group, Distance, Stroke
+                ('BACKGROUND', (3, 1), (4, 1), colors.HexColor('#4b80d6')),  # Gold, Silver for Yards
+                ('BACKGROUND', (5, 1), (6, 1), colors.HexColor('#4b80d6')),  # Gold, Silver for Meters
+                ('TEXTCOLOR', (0, 1), (-1, 1), colors.whitesmoke),
+                ('FONTNAME', (0, 1), (-1, 1), 'Helvetica-Bold'),
+                ('FONTSIZE', (0, 1), (-1, 1), 9),
+                ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+                
+                # General styling for all cells
+                ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#bdc3c7')),
+                
+                # Header padding
+                ('TOPPADDING', (0, 0), (-1, 1), 6),
+                ('BOTTOMPADDING', (0, 0), (-1, 1), 6),
+                ('LEFTPADDING', (0, 0), (-1, -1), 4),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 4),
+                
+                # Data rows styling (row 2 and beyond)
+                ('FONTNAME', (0, 2), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 2), (-1, -1), 8),
+                ('ALIGN', (0, 2), (-1, -1), 'CENTER'),
+                ('ROWBACKGROUNDS', (0, 2), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+                ('TOPPADDING', (0, 2), (-1, -1), 3),
+                ('BOTTOMPADDING', (0, 2), (-1, -1), 3),
+            ]))
+            
+            return table
+        
+        # Add Girls/Women section
+        girls_title = Paragraph("Girls Events", ParagraphStyle(
+            'GirlsTitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=10,
+            alignment=1,
+            textColor=colors.HexColor('#2c3e50')
+        ))
+        elements.append(girls_title)
+        
+        girls_table = create_gender_table(girls_data, "Girls", '#2c3e50')
+        elements.append(girls_table)
+        
+        # Add page break
+        from reportlab.platypus import PageBreak
+        elements.append(PageBreak())
+        
+        # Add title and subtitle for second page
+        elements.append(title)
+        elements.append(subtitle)
+        
+        # Add Boys/Men section
+        boys_title = Paragraph("Boys Events", ParagraphStyle(
+            'BoysTitle',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=10,
+            alignment=1,
+            textColor=colors.HexColor('#2c3e50')
+        ))
+        elements.append(boys_title)
+        
+        boys_table = create_gender_table(boys_data, "Boys", '#2c3e50')
+        elements.append(boys_table)
+        
+        # Add footer
+        elements.append(Spacer(1, 0.3*inch))
+        footer_style = ParagraphStyle(
+            'Footer',
+            parent=styles['Normal'],
+            fontSize=8,
+            alignment=1,
+            textColor=colors.HexColor('#95a5a6')
+        )
+        footer_text = f"Generated on {datetime.datetime.now().strftime('%B %d, %Y')} • Greater Annapolis Swimming League"
+        footer = Paragraph(footer_text, footer_style)
+        #elements.append(footer)
+        
+        # Build PDF
+        doc.build(elements)
+        
+        # Prepare response
+        buffer.seek(0)
+        
+        from flask import make_response
+        response = make_response(buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename="GASL_Time_Standards_{adoption_date.replace(" ", "_")}.pdf"'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Error generating PDF: {e}")
+        return jsonify({'error': f'Failed to generate PDF: {str(e)}'}), 500
+
+
 def extract_metadata_date(filepath):
     """Extract adoption date from metadata line in standards file."""
     try:
