@@ -308,7 +308,7 @@ def validate_filename(filename):
         return False, "Null byte in filename"
     
     # Allow only alphanumeric, dots, dashes, underscores
-    if not re.match(r'^[a-zA-Z0-9._-]+$', filename):
+    if not re.match(r'^[a-zA-Z0-9._\-\s]+$', filename):
         return False, "Invalid characters in filename"
     
     return True, "Valid"
