@@ -57,16 +57,238 @@ except TypeError:
 service = TimeStandardsService()
 
 
+def create_label_overlay(label_text, page_width, page_height, font_size=None, color=None):
+    """
+    Create a PDF overlay with the label text at the specified position.
+    
+    Args:
+        label_text (str): Text to display as label
+        page_width (float): Width of the page
+        page_height (float): Height of the page
+        font_size (int, optional): Font size for the label
+        color (str, optional): Color name for the label
+    
+    Returns:
+        BytesIO: PDF overlay as bytes
+    """
+    from io import BytesIO
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.colors import red, blue, black, green, purple, orange, gray
+    
+    # Use defaults if not provided
+    font_size = font_size or Config.PDF_LABEL_FONT_SIZE_DEFAULT
+    color = color or Config.PDF_LABEL_COLOR_DEFAULT
+    
+    # Fixed settings (not customizable)
+    position_top = 20  # Fixed: 20 points from top
+    font_name = 'Helvetica-Bold'  # Fixed: Helvetica Bold
+    uppercase = True  # Fixed: Always uppercase
+    
+    # Validate font size
+    font_size = max(Config.PDF_LABEL_FONT_SIZE_MIN, min(Config.PDF_LABEL_FONT_SIZE_MAX, font_size))
+    
+    # Map color names to color objects
+    color_map = {
+        'red': red,
+        'blue': blue,
+        'black': black,
+        'green': green,
+        'purple': purple,
+        'orange': orange,
+        'gray': gray
+    }
+    
+    color_obj = color_map.get(color, red)
+    
+    packet = BytesIO()
+    can = canvas.Canvas(packet, pagesize=(page_width, page_height))
+    
+    # Set font, size, and color
+    can.setFont(font_name, font_size)
+    can.setFillColor(color_obj)
+    
+    # Process text (always uppercase)
+    display_text = label_text.upper()
+    
+    # Calculate center position for text
+    text_width = can.stringWidth(display_text, font_name, font_size)
+    x_position = (page_width - text_width) / 2
+    y_position = page_height - position_top
+    
+    # Draw the text
+    can.drawString(x_position, y_position, display_text)
+    can.save()
+    
+    packet.seek(0)
+    return packet
+
+
+def create_blank_page(page_width, page_height):
+    """
+    Create a blank PDF page of the specified dimensions.
+    
+    Args:
+        page_width (float): Width of the page
+        page_height (float): Height of the page
+    
+    Returns:
+        BytesIO: Blank PDF page as bytes
+    """
+    from io import BytesIO
+    from reportlab.pdfgen import canvas
+    
+    packet = BytesIO()
+    can = canvas.Canvas(packet, pagesize=(page_width, page_height))
+    
+    # Draw something invisible to ensure the page is created properly
+    can.setFillAlpha(0)  # Make it completely transparent
+    can.rect(0, 0, 1, 1, fill=1)  # Draw a tiny invisible rectangle
+    can.showPage()  # Ensure the page is finalized
+    can.save()
+    
+    packet.seek(0)
+    return packet
+
+
+def add_labels_to_pdf(input_pdf_file, labels, label_settings=None):
+    """
+    Add labels to PDF file and return a concatenated PDF with all labeled versions.
+    
+    Args:
+        input_pdf_file: File object of the input PDF
+        labels: List of label strings to apply
+        label_settings (dict, optional): Label formatting settings
+    
+    Returns:
+        BytesIO: Concatenated PDF with all labeled versions
+    """
+    from PyPDF2 import PdfReader, PdfWriter
+    from io import BytesIO
+    import copy
+    
+    # Use default settings if none provided
+    if label_settings is None:
+        label_settings = {}
+    
+    # Read the input PDF once to get basic info
+    input_pdf_file.seek(0)
+    input_pdf_data = input_pdf_file.read()
+    
+    # Validate input PDF has pages
+    temp_reader = PdfReader(BytesIO(input_pdf_data))
+    if len(temp_reader.pages) == 0:
+        raise ValueError("Input PDF has no pages")
+    
+    # Get page dimensions from first page
+    first_page_temp = temp_reader.pages[0]
+    page_width = float(first_page_temp.mediabox.width)
+    page_height = float(first_page_temp.mediabox.height)
+    total_pages = len(temp_reader.pages)
+    
+    # Create a writer for the final concatenated PDF
+    final_writer = PdfWriter()
+    
+    # Process each label
+    for label_index, label in enumerate(labels):
+        try:
+            # Create a fresh reader for each label to avoid page modification issues
+            input_buffer = BytesIO(input_pdf_data)
+            reader = PdfReader(input_buffer)
+            
+            # Verify we still have pages
+            if len(reader.pages) == 0:
+                raise ValueError(f"No pages found in PDF for label {label_index + 1}")
+            
+            # Create label overlay with custom settings
+            overlay_packet = create_label_overlay(
+                label, 
+                page_width, 
+                page_height,
+                font_size=label_settings.get('font_size'),
+                color=label_settings.get('color')
+            )
+            overlay_reader = PdfReader(overlay_packet)
+            
+            # Verify overlay was created successfully
+            if len(overlay_reader.pages) == 0:
+                raise ValueError(f"Failed to create overlay for label: {label}")
+            
+            overlay_page = overlay_reader.pages[0]
+            
+            # Get first page and merge with overlay
+            first_page = reader.pages[0]
+            first_page.merge_page(overlay_page)
+            final_writer.add_page(first_page)
+            
+            # Add remaining pages unchanged
+            for page_num in range(1, len(reader.pages)):
+                if page_num < len(reader.pages):  # Safety check
+                    final_writer.add_page(reader.pages[page_num])
+            
+            # Add blank page if this labeled copy has odd number of pages (for double-sided printing)
+            current_pages = len(reader.pages)
+            
+            if Config.PDF_ADD_BLANK_PAGE_FOR_DOUBLE_SIDED and current_pages % 2 == 1:
+                # Create and add blank page
+                blank_packet = create_blank_page(page_width, page_height)
+                blank_reader = PdfReader(blank_packet)
+                
+                if len(blank_reader.pages) > 0:
+                    blank_page = blank_reader.pages[0]
+                    final_writer.add_page(blank_page)
+                
+        except Exception as e:
+            raise ValueError(f"Error processing label '{label}': {str(e)}")
+    
+    # Verify we have pages to write
+    if len(final_writer.pages) == 0:
+        raise ValueError("No pages to write to output PDF")
+    
+    # Write the final concatenated PDF
+    output_buffer = BytesIO()
+    final_writer.write(output_buffer)
+    output_buffer.seek(0)
+    
+    return output_buffer
+
+
 class Config:
     """Configuration class for default values."""
     DEFAULT_GOLD_PERCENTILE = 0.15
     DEFAULT_SILVER_PERCENTILE = 0.55
     DEFAULT_HEAT_TIME = 15  # seconds
     DEFAULT_EVENT_TIME = 30  # seconds
-    ALLOWED_EXTENSIONS = {'csv'}
+    ALLOWED_EXTENSIONS = {'csv', 'pdf'}
     MAX_FILENAME_LENGTH = 255
     MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
-    ALLOWED_MIME_TYPES = {'text/csv', 'text/plain', 'application/csv'}
+    ALLOWED_MIME_TYPES = {'text/csv', 'text/plain', 'application/csv', 'application/pdf'}
+    # PDF labeling defaults
+    PDF_LABEL_FONT_SIZE_DEFAULT = 10
+    PDF_LABEL_FONT_SIZE_MIN = 6
+    PDF_LABEL_FONT_SIZE_MAX = 24
+    PDF_LABEL_COLOR_DEFAULT = 'red'
+    PDF_LABEL_POSITION_TOP_DEFAULT = 20  # points from top
+    PDF_LABEL_POSITION_TOP_MIN = 10
+    PDF_LABEL_POSITION_TOP_MAX = 100
+    PDF_LABEL_AVAILABLE_COLORS = {
+        'red': (1, 0, 0),
+        'blue': (0, 0, 1),
+        'black': (0, 0, 0),
+        'green': (0, 0.5, 0),
+        'purple': (0.5, 0, 0.5),
+        'orange': (1, 0.5, 0),
+        'gray': (0.5, 0.5, 0.5)
+    }
+    PDF_LABEL_AVAILABLE_FONTS = [
+        'Helvetica-Bold',
+        'Helvetica',
+        'Times-Bold',
+        'Times-Roman',
+        'Courier-Bold',
+        'Courier'
+    ]
+    # Double-sided printing support
+    PDF_ADD_BLANK_PAGE_FOR_DOUBLE_SIDED = True
 
 
 def validate_filename(filename):
@@ -113,48 +335,72 @@ def validate_file_content(file_path):
                 print(f"Warning: Magic MIME detection failed: {e}")
                 # Continue with other validations
         
-        # Enhanced CSV validation - check file content
-        try:
-            # Read first few lines to validate CSV structure
-            with open(file_path, 'r', encoding='utf-8') as f:
-                first_line = f.readline().strip()
-                if not first_line:
-                    return False, "Empty file"
+        # File type specific validation
+        file_extension = os.path.splitext(file_path)[1].lower()
+        
+        if file_extension == '.pdf':
+            # PDF validation
+            try:
+                from PyPDF2 import PdfReader
+                reader = PdfReader(file_path)
                 
-                # Check for common CSV characteristics
-                if not (',' in first_line or ';' in first_line or '\t' in first_line):
-                    return False, "File does not appear to be a valid CSV"
+                # Check if PDF is readable and has pages
+                if len(reader.pages) == 0:
+                    return False, "PDF file has no pages"
                 
-                # Check for binary content in first 1KB
-                f.seek(0)
-                sample = f.read(1024)
+                # Try to read first page to ensure it's not corrupted
+                first_page = reader.pages[0]
+                # This will raise an exception if the PDF is corrupted
+                _ = first_page.mediabox
                 
-                # Check for null bytes (indicates binary file)
-                if '\x00' in sample:
-                    return False, "File appears to be binary, not CSV"
+            except Exception as e:
+                return False, f"Invalid PDF file: {str(e)}"
                 
-                # Check for excessive non-printable characters
-                non_printable = sum(1 for c in sample if ord(c) < 32 and c not in '\n\r\t')
-                if non_printable > len(sample) * 0.1:  # More than 10% non-printable
-                    return False, "File contains too many non-printable characters"
-            
-            # Try to parse with pandas
-            df = pd.read_csv(file_path, nrows=5)
-            if df.empty:
-                return False, "Invalid CSV format - no data found"
-            
-            # Check for reasonable number of columns (1-50)
-            if len(df.columns) < 1 or len(df.columns) > 50:
-                return False, f"Unexpected number of columns: {len(df.columns)}"
-            
-        except UnicodeDecodeError:
-            return False, "File encoding not supported - please use UTF-8"
-        except pd.errors.EmptyDataError:
-            return False, "CSV file is empty"
-        except pd.errors.ParserError as e:
-            return False, f"CSV parsing error: {str(e)}"
-        except Exception as e:
-            return False, f"File validation error: {str(e)}"
+        elif file_extension == '.csv':
+            # Enhanced CSV validation - check file content
+            try:
+                # Read first few lines to validate CSV structure
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    first_line = f.readline().strip()
+                    if not first_line:
+                        return False, "Empty file"
+                    
+                    # Check for common CSV characteristics
+                    if not (',' in first_line or ';' in first_line or '\t' in first_line):
+                        return False, "File does not appear to be a valid CSV"
+                    
+                    # Check for binary content in first 1KB
+                    f.seek(0)
+                    sample = f.read(1024)
+                    
+                    # Check for null bytes (indicates binary file)
+                    if '\x00' in sample:
+                        return False, "File appears to be binary, not CSV"
+                    
+                    # Check for excessive non-printable characters
+                    non_printable = sum(1 for c in sample if ord(c) < 32 and c not in '\n\r\t')
+                    if non_printable > len(sample) * 0.1:  # More than 10% non-printable
+                        return False, "File contains too many non-printable characters"
+                
+                # Try to parse with pandas
+                df = pd.read_csv(file_path, nrows=5)
+                if df.empty:
+                    return False, "Invalid CSV format - no data found"
+                
+                # Check for reasonable number of columns (1-50)
+                if len(df.columns) < 1 or len(df.columns) > 50:
+                    return False, f"Unexpected number of columns: {len(df.columns)}"
+                
+            except UnicodeDecodeError:
+                return False, "File encoding not supported - please use UTF-8"
+            except pd.errors.EmptyDataError:
+                return False, "CSV file is empty"
+            except pd.errors.ParserError as e:
+                return False, f"CSV parsing error: {str(e)}"
+            except Exception as e:
+                return False, f"File validation error: {str(e)}"
+        else:
+            return False, f"Unsupported file type: {file_extension}"
         
         return True, "Valid"
     
@@ -267,6 +513,12 @@ def time_standards():
 def close_to_pin():
     """Serve the close to pin analysis page."""
     return render_template('close-to-pin.html')
+
+
+@app.route('/pdf-labeler')
+def pdf_labeler():
+    """Serve the PDF labeling page."""
+    return render_template('pdf-labeler.html')
 
 
 @app.route('/health', methods=['GET'])
@@ -1044,6 +1296,116 @@ def analyze_close_to_pin():
         print(f"DEBUG: Exception occurred: {e}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/label-pdf', methods=['POST'])
+@limiter.limit("3 per minute")
+def label_pdf():
+    """Add labels to a PDF file and return concatenated result."""
+    try:
+        # Check if PDF file is present
+        if 'pdf_file' not in request.files:
+            return jsonify({'error': 'Missing PDF file'}), 400
+        
+        pdf_file = request.files['pdf_file']
+        
+        # Validate PDF file
+        if not pdf_file or pdf_file.filename == '':
+            return jsonify({'error': 'No PDF file selected'}), 400
+        
+        # Enhanced filename validation
+        is_valid, message = validate_filename(pdf_file.filename)
+        if not is_valid:
+            return jsonify({'error': f'Invalid filename: {message}'}), 400
+        
+        if not allowed_file(pdf_file.filename):
+            return jsonify({'error': f'File type not allowed: {pdf_file.filename}'}), 400
+        
+        # Get labels from form data
+        labels_str = request.form.get('labels', '')
+        if not labels_str:
+            return jsonify({'error': 'No labels provided'}), 400
+        
+        # Parse labels (expect comma-separated string or JSON array)
+        labels = []
+        try:
+            import json
+            # Try to parse as JSON array first
+            labels = json.loads(labels_str)
+            if not isinstance(labels, list):
+                raise ValueError("Labels must be an array")
+        except (json.JSONDecodeError, ValueError):
+            # Fallback to comma-separated string
+            labels = [label.strip() for label in labels_str.split(',') if label.strip()]
+        
+        if not labels:
+            return jsonify({'error': 'No valid labels provided'}), 400
+        
+        # Validate and sanitize labels
+        sanitized_labels = []
+        for label in labels:
+            sanitized_label = sanitize_input(label, 'string', max_length=50)
+            if sanitized_label:
+                sanitized_labels.append(sanitized_label)
+        
+        if not sanitized_labels:
+            return jsonify({'error': 'No valid labels after sanitization'}), 400
+        
+        # Get and validate label settings
+        label_settings = {}
+        
+        # Font size
+        font_size = request.form.get('font_size')
+        if font_size:
+            try:
+                font_size = int(font_size)
+                font_size = max(Config.PDF_LABEL_FONT_SIZE_MIN, min(Config.PDF_LABEL_FONT_SIZE_MAX, font_size))
+                label_settings['font_size'] = font_size
+            except ValueError:
+                pass
+        
+        # Color
+        color = request.form.get('color')
+        if color and color in Config.PDF_LABEL_AVAILABLE_COLORS:
+            label_settings['color'] = color
+        
+        # Save PDF file temporarily for validation
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pdf_filename = secure_filename(pdf_file.filename)
+            pdf_filepath = os.path.join(temp_dir, pdf_filename)
+            
+            # Save file
+            pdf_file.save(pdf_filepath)
+            
+            # Validate file content
+            is_valid, message = validate_file_content(pdf_filepath)
+            if not is_valid:
+                return jsonify({'error': f'File validation failed: {message}'}), 400
+            
+            # Reset file pointer and process PDF
+            pdf_file.seek(0)
+            
+            # Process the PDF with labels
+            try:
+                labeled_pdf_buffer = add_labels_to_pdf(pdf_file, sanitized_labels, label_settings)
+                
+                # Generate output filename
+                base_name = os.path.splitext(pdf_file.filename)[0]
+                output_filename = f"{base_name}_labeled.pdf"
+                
+                # Return the labeled PDF
+                from flask import make_response
+                response = make_response(labeled_pdf_buffer.getvalue())
+                response.headers['Content-Type'] = 'application/pdf'
+                response.headers['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+                
+                return response
+                
+            except Exception as e:
+                return jsonify({'error': f'PDF processing failed: {str(e)}'}), 500
+    
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

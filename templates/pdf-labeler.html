@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GASL PDF Labeler</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group.compact {
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-group.compact label {
+            font-size: 0.9rem;
+            margin-bottom: 0.25rem;
+        }
+        
+        .form-group.compact small {
+            font-size: 0.75rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
+        
+        .preview-section {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .label-preview {
+            background: white;
+            border: 2px dashed #dee2e6;
+            border-radius: 4px;
+            height: 60px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            margin: 0.5rem 0;
+            position: relative;
+            padding: 10px;
+        }
+        
+        #preview-text {
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+        
+        .label-preview::before {
+            content: '📄 PDF Page';
+            position: absolute;
+            bottom: 5px;
+            right: 10px;
+            font-size: 0.7rem;
+            color: #999;
+        }
+        
+        .printing-info {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: #e8f4fd;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+        }
+        
+        .printing-info h4 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        
+        .printing-info ul {
+            margin-bottom: 0;
+        }
+        
+        .fixed-settings {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .fixed-settings h3 {
+            margin-top: 0;
+            margin-bottom: 0.75rem;
+            color: #6c757d;
+            font-size: 1rem;
+        }
+        
+        .fixed-settings-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 0.5rem;
+        }
+        
+        .fixed-settings .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.25rem 0;
+        }
+        
+        .fixed-settings .setting-item label {
+            font-weight: 500;
+            margin: 0;
+        }
+        
+        .fixed-settings .setting-value {
+            color: #6c757d;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
+            </div>
+            <h1>📄 GASL PDF Labeler</h1>
+            <p>Add labels to Meet Program .PDF</p>
+        </header>
+
+        <main>
+            <section class="intro-section">
+                <div class="intro-content">
+                    <h2>🏷️ About PDF Labeler</h2>
+                    <p>The PDF Labeler tool helps you create multiple labeled copies of a PDF document. Upload a PDF file and provide a list of labels, and the tool will generate a concatenated PDF file containing one copy of the original document for each label, with the label prominently displayed at the top of the first page.</p>
+                    <p>This is particularly useful for creating role-specific copies of documents like heat sheets, where each copy needs to be labeled for different positions (e.g., "Announcer", "Lane Organizer", "Clerk of Course", etc.).</p>
+                </div>
+            </section>
+            
+            <form id="pdf-labeler-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h2>📄 PDF File & Labels</h2>
+                    
+                    <div class="form-group">
+                        <label for="pdf_file">📎 PDF File:</label>
+                        <input type="file" id="pdf_file" name="pdf_file" accept=".pdf" required>
+                        <small>Select a PDF file to add labels to (max 16MB)</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="labels_input">🏷️ Labels:</label>
+                        <textarea id="labels_input" name="labels" rows="4" placeholder="Enter labels, one per line:&#10;Announcer&#10;Lane Organizer&#10;Clerk of Course&#10;Kid Finder&#10;Head Coach" required></textarea>
+                        <small>Enter labels one per line. Each label will create a separate copy of the PDF. If you need multiple copies with the same label, duplicate that label on another line.</small>
+                    </div>
+
+                    <div class="preset-labels">
+                        <h3>📋 Common Label Presets:</h3>
+                        <div class="preset-buttons">
+                            <button type="button" class="preset-btn" data-labels="Announcer,Concessions,Lane Organizer,Clerk of Course,Kid Finder,Head Coach,Assistant Coach,Lead Official,Starter,Stroke & Turn Judge">
+                                🏊‍♂️ Typical Meet Roles
+                            </button>
+                            <!-- <button type="button" class="preset-btn" data-labels="Head Coach,Assistant Coach">
+                                👥 Team Roles
+                            </button>
+                            <button type="button" class="preset-btn" data-labels="Lead Official,Starter,Stroke & Turn Judge">
+                                👩‍⚖️ Official Roles
+                            </button> -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2>⚙️ Label Settings</h2>
+                    <div class="settings-grid">
+                        <div class="form-group compact">
+                            <label for="font_size">📏 Font Size:</label>
+                            <input type="number" id="font_size" name="font_size" min="6" max="24" value="10" step="1">
+                            <small>Font size in points (6-24)</small>
+                        </div>
+                        
+                        <div class="form-group compact">
+                            <label for="color">🎨 Color:</label>
+                            <select id="color" name="color">
+                                <option value="red" selected>Red</option>
+                                <option value="black">Black</option>
+                                <option value="blue">Blue</option>
+                                <option value="green">Green</option>
+                                <option value="purple">Purple</option>
+                                <option value="orange">Orange</option>
+                                <option value="gray">Gray</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- <div class="fixed-settings">
+                        <h3>🔒 Fixed Settings</h3>
+                        <div class="fixed-settings-grid">
+                            <div class="setting-item">
+                                <label>📍 Position:</label>
+                                <span class="setting-value">20 points from top (fixed)</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>✍️ Font:</label>
+                                <span class="setting-value">Helvetica Bold (fixed)</span>
+                            </div>
+                            <div class="setting-item">
+                                <label>✨ Text Case:</label>
+                                <span class="setting-value">Always uppercase (fixed)</span>
+                            </div>
+                        </div>
+                    </div> -->
+                    
+                    <div class="preview-section">
+                        <h3>👀 Preview</h3>
+                        <div class="label-preview" id="label-preview">
+                            <span id="preview-text">SAMPLE LABEL</span>
+                        </div>
+                        <small>Preview shows approximate appearance (actual positioning may vary by PDF)</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="submit-btn" class="btn-primary">
+                        <span class="btn-text">📄 Generate Labeled PDF</span>
+                        <span class="loading-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                            Processing...
+                        </span>
+                    </button>
+                    <button type="reset" class="btn-secondary">🔄 Reset Form</button>
+                </div>
+            </form>
+
+            <div id="success-section" style="display: none;">
+                <h2>✅ Success</h2>
+                <div id="success-content" class="success-message">
+                    <p>Your labeled PDF has been generated successfully!</p>
+                    <p>The download should start automatically. If not, <a id="download-link" href="#" download>click here to download</a>.</p>
+                </div>
+            </div>
+
+            <div id="error-section" style="display: none;">
+                <h2>❌ Error</h2>
+                <div id="error-content" class="error-message"></div>
+            </div>
+
+            <!-- <div class="info-section">
+                <h3>💡 Tips & Guidelines</h3>
+                <ul>
+                    <li><strong>File Size:</strong> Maximum PDF file size is 16MB</li>
+                    <li><strong>Label Length:</strong> Keep labels short (under 50 characters) for best appearance</li>
+                    <li><strong>Multiple Labels:</strong> Each label creates a complete copy of the PDF document</li>
+                    <li><strong>Label Position:</strong> Labels appear centered horizontally at your specified distance from the top</li>
+                    <li><strong>Font Size:</strong> Larger fonts work better for readability but may not fit on narrow pages</li>
+                    <li><strong>Color Choice:</strong> Dark colors (black, blue) work well on light backgrounds</li>
+                    <li><strong>Preview:</strong> Use the preview to see how your settings will look before generating</li>
+                    <li><strong>Output Format:</strong> All labeled copies are concatenated into a single PDF file</li>
+                    <li><strong>Double-Sided Printing:</strong> If your input PDF has an odd number of pages, a blank page is automatically added to each copy to ensure proper double-sided printing alignment</li>
+                </ul>
+                
+                <div class="printing-info">
+                    <h4>🖨️ Double-Sided Printing Support</h4>
+                    <p>The generated PDF is optimized for double-sided printing:</p>
+                    <ul>
+                        <li>Each labeled copy starts on an odd-numbered page</li>
+                        <li>Blank pages are automatically added when needed</li>
+                        <li>Print settings: Select "Print on both sides" or "Duplex printing"</li>
+                        <li>Flip setting: Use "Flip on long edge" for best results</li>
+                    </ul>
+                </div>
+            </div> -->
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Greater Annapolis Swim League</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/pdf-labeler.js') }}"></script>
+</body>
+</html>
