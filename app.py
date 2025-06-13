@@ -258,7 +258,7 @@ class Config:
     DEFAULT_SILVER_PERCENTILE = 0.55
     DEFAULT_HEAT_TIME = 15  # seconds
     DEFAULT_EVENT_TIME = 30  # seconds
-    ALLOWED_EXTENSIONS = {'csv', 'pdf'}
+    ALLOWED_EXTENSIONS = {'csv', 'pdf', 'txt'}
     MAX_FILENAME_LENGTH = 255
     MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
     ALLOWED_MIME_TYPES = {'text/csv', 'text/plain', 'application/csv', 'application/pdf'}
@@ -356,8 +356,8 @@ def validate_file_content(file_path):
             except Exception as e:
                 return False, f"Invalid PDF file: {str(e)}"
                 
-        elif file_extension == '.csv':
-            # Enhanced CSV validation - check file content
+        elif file_extension in ['.csv', '.txt']:
+            # Enhanced CSV/TXT validation - check file content
             try:
                 # Read first few lines to validate CSV structure
                 with open(file_path, 'r', encoding='utf-8') as f:
@@ -519,6 +519,12 @@ def close_to_pin():
 def pdf_labeler():
     """Serve the PDF labeling page."""
     return render_template('pdf-labeler.html')
+
+
+@app.route('/swim-event-tracker')
+def swim_event_tracker():
+    """Serve the swim event tracker page."""
+    return render_template('swim-event-tracker.html')
 
 
 @app.route('/health', methods=['GET'])
@@ -1939,6 +1945,189 @@ def log_standards_changes(standards_df, parameters):
     
     except Exception as e:
         print(f"Warning: Failed to log standards changes: {e}")
+
+
+@app.route('/generate-swim-event-tracker', methods=['POST'])
+@limiter.limit("3 per minute")
+def generate_swim_event_tracker():
+    """Generate swim event tracker PDF from uploaded CSV/TXT file."""
+    try:
+        # Check if events file is present
+        if 'events_file' not in request.files:
+            return jsonify({'error': 'Missing events file'}), 400
+        
+        events_file = request.files['events_file']
+        
+        # Validate events file
+        if not events_file or events_file.filename == '':
+            return jsonify({'error': 'No events file selected'}), 400
+        
+        # Enhanced filename validation
+        is_valid, message = validate_filename(events_file.filename)
+        if not is_valid:
+            return jsonify({'error': f'Invalid filename: {message}'}), 400
+        
+        if not allowed_file(events_file.filename):
+            return jsonify({'error': f'File type not allowed: {events_file.filename}'}), 400
+        
+        # Get swim meet name
+        swim_meet_name = sanitize_input(
+            request.form.get('swim_meet_name', 'Swim Event Race Number Tracker'), 
+            'string', 
+            max_length=100
+        )
+        
+        # Save events file temporarily for validation
+        with tempfile.TemporaryDirectory() as temp_dir:
+            events_filename = secure_filename(events_file.filename)
+            events_filepath = os.path.join(temp_dir, events_filename)
+            
+            # Save file
+            events_file.save(events_filepath)
+            
+            # Validate file content
+            is_valid, message = validate_file_content(events_filepath)
+            if not is_valid:
+                return jsonify({'error': f'File validation failed: {message}'}), 400
+            
+            # Parse events and generate PDF
+            try:
+                # Parse events from uploaded file
+                events = parse_events_from_file(events_filepath)
+                
+                if not events:
+                    return jsonify({'error': 'No valid events found in the file'}), 400
+                
+                # Create PDF in memory
+                pdf_buffer = create_swim_event_tracker_pdf(events, swim_meet_name)
+                
+                # Generate output filename
+                safe_meet_name = re.sub(r'[^\w\s-]', '', swim_meet_name).strip()
+                safe_meet_name = re.sub(r'[-\s]+', '_', safe_meet_name)
+                output_filename = f"{safe_meet_name}_Event_Tracker.pdf"
+                
+                # Return the PDF
+                from flask import make_response
+                response = make_response(pdf_buffer.getvalue())
+                response.headers['Content-Type'] = 'application/pdf'
+                response.headers['Content-Disposition'] = f'attachment; filename="{output_filename}"'
+                
+                return response
+                
+            except Exception as e:
+                return jsonify({'error': f'PDF generation failed: {str(e)}'}), 500
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def parse_events_from_file(filepath):
+    """Parse events from uploaded CSV/TXT file."""
+    events = []
+    
+    try:
+        with open(filepath, 'r', encoding='utf-8') as file:
+            for line in file:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Split by comma and extract the first 3 columns
+                parts = line.split(',')
+                if len(parts) >= 3:
+                    try:
+                        event_number = parts[0].strip()
+                        event_name = parts[1].strip()
+                        num_heats = int(parts[2].strip())
+                        events.append((event_number, event_name, num_heats))
+                    except (ValueError, IndexError):
+                        # Skip invalid lines
+                        continue
+                        
+    except Exception as e:
+        raise Exception(f"Error parsing events file: {str(e)}")
+    
+    return events
+
+
+def create_swim_event_tracker_pdf(events, swim_meet_name):
+    """Create swim event tracker PDF with custom title."""
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from io import BytesIO
+    
+    # Create PDF in memory
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    
+    # Title
+    c.setFont("Helvetica-Bold", 16)
+    title_text = swim_meet_name
+    text_width = c.stringWidth(title_text, "Helvetica-Bold", 16)
+    c.drawString((width - text_width)/2, height - 0.5*inch, title_text)
+    
+    # Find maximum number of heats to determine column layout
+    max_heats = max(num_heats for _, _, num_heats in events) if events else 1
+    
+    # Table setup
+    event_col_width = 3*inch
+    heat_col_width = 0.8*inch
+    start_x = 0.5*inch
+    header_y = height - 1.2*inch
+    
+    # Draw table headers
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(start_x, header_y, "Event")
+    
+    for heat_num in range(1, max_heats + 1):
+        x_pos = start_x + event_col_width + (heat_num - 1) * heat_col_width
+        c.drawString(x_pos, header_y, f"Heat {heat_num}")
+    
+    # Draw header underline
+    header_line_y = header_y - 3
+    c.line(start_x, header_line_y, start_x + event_col_width + max_heats * heat_col_width, header_line_y)
+    
+    # Starting position for data rows
+    y_position = header_y - 0.3*inch
+    line_height = 0.25*inch
+    
+    # Set font for event entries
+    c.setFont("Helvetica", 10)
+    
+    for event_number, event_name, num_heats in events:
+        # Check if we need a new page
+        if y_position < 1*inch:
+            c.showPage()
+            # Redraw headers on new page
+            y_position = height - 0.5*inch
+            c.setFont("Helvetica-Bold", 10)
+            c.drawString(start_x, y_position, "Event")
+            for heat_num in range(1, max_heats + 1):
+                x_pos = start_x + event_col_width + (heat_num - 1) * heat_col_width
+                c.drawString(x_pos, y_position, f"Heat {heat_num}")
+            header_line_y = y_position - 3
+            c.line(start_x, header_line_y, start_x + event_col_width + max_heats * heat_col_width, header_line_y)
+            y_position -= 0.3*inch
+            c.setFont("Helvetica", 10)
+        
+        # Draw event number and name
+        event_text = f"{event_number}: {event_name}"
+        c.drawString(start_x, y_position, event_text)
+        
+        # Draw underlines only for existing heats
+        for heat in range(1, num_heats + 1):
+            x_pos = start_x + event_col_width + (heat - 1) * heat_col_width
+            underline_width = 0.6*inch
+            c.line(x_pos, y_position - 2, x_pos + underline_width, y_position - 2)
+        
+        # Move to next event row
+        y_position -= line_height
+    
+    c.save()
+    buffer.seek(0)
+    return buffer
 
 
 if __name__ == '__main__':

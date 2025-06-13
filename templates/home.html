@@ -42,6 +42,34 @@
                         Launch Calculator
                     </a>
                 </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">🏊‍♂️</div>
+                    <h2>Swim Event Race Number Tracker</h2>
+                    <p>Generate a printable form to track race numbers for each heat of swim events. Upload your events file and create an organized tracking sheet.</p>
+                    <div class="tool-features">
+                        <span class="feature">Event Organization</span>
+                        <span class="feature">Heat Tracking</span>
+                        <span class="feature">Printable PDF</span>
+                    </div>
+                    <a href="{{ url_for('swim_event_tracker') }}" class="tool-button">
+                        Launch Tracker Generator
+                    </a>
+                </div>
+
+                <div class="tool-card">
+                    <div class="tool-icon">📄</div>
+                    <h2>PDF Labeler</h2>
+                    <p>Create labeled copies of PDF documents for different roles or purposes. Upload a PDF and generate multiple copies with custom labels.</p>
+                    <div class="tool-features">
+                        <span class="feature">Custom Labels</span>
+                        <span class="feature">Multiple Copies</span>
+                        <span class="feature">Role Assignment</span>
+                    </div>
+                    <a href="{{ url_for('pdf_labeler') }}" class="tool-button">
+                        Launch PDF Labeler
+                    </a>
+                </div>
             </div>
 
             <div class="info-section">
@@ -53,8 +81,9 @@
                 </p>
                 <ul>
                     <li><strong>Close to Pin Analysis:</strong> Individual swimmer progress tracking and goal setting</li>
-                    <li><strong>PDF Labeler:</strong> Create labeled copies of heat sheets for meet day</li>
                     <li><strong>Time Standards Calculator:</strong> Data-driven approach to setting qualification times</li>
+                    <li><strong>Swim Event Tracker:</strong> Generate printable forms to track race numbers for each event heat</li>
+                    <li><strong>PDF Labeler:</strong> Create labeled copies of documents for different roles and purposes</li>
                 </ul>
                 
                 <div class="current-standards-section">

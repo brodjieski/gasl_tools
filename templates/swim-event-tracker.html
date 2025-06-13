@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GASL Swim Event Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .form-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+        
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            color: #666;
+            font-size: 0.875rem;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-primary:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 0.5rem;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 4px;
+            border: 1px solid #c3e6cb;
+            margin-top: 1rem;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 4px;
+            border: 1px solid #f5c6cb;
+            margin-top: 1rem;
+        }
+        
+        .info-section {
+            background: #e8f4fd;
+            padding: 1.5rem;
+            border-radius: 8px;
+            border-left: 4px solid #007bff;
+            margin-bottom: 2rem;
+        }
+        
+        .info-section h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        
+        .sample-format {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 1rem;
+            margin: 1rem 0;
+            font-family: monospace;
+            font-size: 0.875rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
+            </div>
+            <h1>🏊‍♂️ Swim Event Race Number Tracker</h1>
+            <p>Generate a printable form to track race numbers for each heat of swim events</p>
+        </header>
+
+        <main>
+            <section class="info-section">
+                <h3>📋 About This Tool</h3>
+                <p>
+                    This tool creates a printable PDF form that helps you track which race numbers are assigned 
+                    to each heat of swim events. Upload your events file (CSV or TXT format) and provide a meet name 
+                    to generate a professional tracking sheet.
+                </p>
+                <p><strong>Expected file format:</strong> Each line should contain: Event Number, Event Name, Number of Heats (comma-separated)</p>
+                <div class="sample-format">
+<strong>Example file content:</strong>
+1,Mixed 8&U 100yd Free Relay,1
+2,Men Open 100yd Medley Relay,1
+3,Women Open 100yd Medley Relay,1
+4,Boys 10&U 100yd IM,1
+5,Girls 10&U 100yd IM,1
+                </div>
+            </section>
+            
+            <form id="swim-tracker-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h2>🏊‍♂️ Meet Information</h2>
+                    
+                    <div class="form-group">
+                        <label for="swim_meet_name">🏆 Swim Meet Name:</label>
+                        <input type="text" id="swim_meet_name" name="swim_meet_name" 
+                               placeholder="e.g., GASL Championship Meet 2025" required>
+                        <small>This will appear as the title on your tracking sheet</small>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2>📄 Events File</h2>
+                    
+                    <div class="form-group">
+                        <label for="events_file">📎 Events File (CSV or TXT):</label>
+                        <input type="file" id="events_file" name="events_file" 
+                               accept=".csv,.txt" required>
+                        <small>Upload a CSV or TXT file containing event number, event name, and number of heats (max 16MB)</small>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="submit-btn" class="btn-primary">
+                        <span class="btn-text">🏊‍♂️ Generate Event Tracker PDF</span>
+                        <span class="loading-text" style="display: none;">
+                            <span class="loading-spinner"></span>
+                            Generating PDF...
+                        </span>
+                    </button>
+                </div>
+            </form>
+
+            <div id="success-section" style="display: none;">
+                <div class="success-message">
+                    <h3>✅ Success!</h3>
+                    <p>Your swim event tracker PDF has been generated successfully!</p>
+                    <p>The download should start automatically. If not, <a id="download-link" href="#" download>click here to download</a>.</p>
+                </div>
+            </div>
+
+            <div id="error-section" style="display: none;">
+                <div class="error-message">
+                    <h3>❌ Error</h3>
+                    <div id="error-content"></div>
+                </div>
+            </div>
+
+            <section class="info-section">
+                <h3>💡 How to Use the Generated Tracker</h3>
+                <ul>
+                    <li><strong>Print the PDF:</strong> Print the generated tracking sheet</li>
+                    <li><strong>Track Race Numbers:</strong> Write the assigned race numbers under each heat column</li>
+                    <li><strong>Table Format:</strong> Each event is a row, each heat is a column with space to write race numbers</li>
+                    <li><strong>Organized Layout:</strong> Events are listed with only the necessary heat columns displayed</li>
+                </ul>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Greater Annapolis Swim League</p>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('swim-tracker-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const form = e.target;
+            const formData = new FormData(form);
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const loadingText = submitBtn.querySelector('.loading-text');
+            const successSection = document.getElementById('success-section');
+            const errorSection = document.getElementById('error-section');
+            
+            // Hide previous results
+            successSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            
+            // Show loading state
+            submitBtn.disabled = true;
+            btnText.style.display = 'none';
+            loadingText.style.display = 'inline';
+            
+            try {
+                const response = await fetch('/generate-swim-event-tracker', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (response.ok) {
+                    // Success - download the PDF
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    
+                    // Get filename from response headers
+                    const contentDisposition = response.headers.get('content-disposition');
+                    let filename = 'swim_event_tracker.pdf';
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+                        if (filenameMatch) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+                    
+                    // Create download link
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                    
+                    // Show success message
+                    const downloadLink = document.getElementById('download-link');
+                    downloadLink.href = url;
+                    downloadLink.download = filename;
+                    successSection.style.display = 'block';
+                    
+                } else {
+                    // Error response
+                    const errorData = await response.json();
+                    document.getElementById('error-content').textContent = errorData.error || 'An unknown error occurred';
+                    errorSection.style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('error-content').textContent = 'Network error: ' + error.message;
+                errorSection.style.display = 'block';
+            } finally {
+                // Reset loading state
+                submitBtn.disabled = false;
+                btnText.style.display = 'inline';
+                loadingText.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
