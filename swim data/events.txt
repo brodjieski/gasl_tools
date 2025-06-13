@@ -1,0 +1,57 @@
+1,Mixed 8&U 100yd Free Relay,1,1,F
+2,Men Open 100yd Medley Relay,1,1,F
+3,Women Open 100yd Medley Relay,1,1,F
+4,Boys 10&U 100yd IM,1,1,F
+5,Girls 10&U 100yd IM,1,1,F
+6,Boys 11-12 100yd IM,1,1,F
+7,Girls 11-12 100yd IM,2,1,F
+8,Boys 13-14 100yd IM,1,1,F
+9,Girls 13-14 100yd IM,2,1,F
+10,Men 15-18 100yd IM,2,1,F
+11,Women 15-18 100yd IM,1,1,F
+12,Boys 6&U 25yd Free,2,1,F
+13,Girls 6&U 25yd Free,4,1,F
+14,Boys 7-8 25yd Free,3,1,F
+15,Girls 7-8 25yd Free,5,1,F
+16,Boys 9-10 50yd Free,3,1,F
+17,Girls 9-10 50yd Free,4,1,F
+18,Boys 11-12 50yd Free,3,1,F
+19,Girls 11-12 50yd Free,4,1,F
+20,Boys 13-14 50yd Free,2,1,F
+21,Girls 13-14 50yd Free,4,1,F
+22,Men 15-18 50yd Free,2,1,F
+23,Women 15-18 50yd Free,2,1,F
+24,Boys 6&U 25yd Back,2,1,F
+25,Girls 6&U 25yd Back,3,1,F
+26,Boys 7-8 25yd Back,3,1,F
+27,Girls 7-8 25yd Back,5,1,F
+28,Boys 9-10 25yd Back,3,1,F
+29,Girls 9-10 25yd Back,4,1,F
+30,Boys 11-12 50yd Back,2,1,F
+31,Girls 11-12 50yd Back,4,1,F
+32,Boys 13-14 50yd Back,1,1,F
+33,Girls 13-14 50yd Back,3,1,F
+34,Men 15-18 50yd Back,1,1,F
+35,Women 15-18 50yd Back,2,1,F
+36,Boys 8&U 25yd Breast,1,1,F
+37,Girls 8&U 25yd Breast,2,1,F
+38,Boys 9-10 25yd Breast,2,1,F
+39,Girls 9-10 25yd Breast,2,1,F
+40,Boys 11-12 50yd Breast,1,1,F
+41,Girls 11-12 50yd Breast,3,1,F
+42,Boys 13-14 50yd Breast,1,1,F
+43,Girls 13-14 50yd Breast,3,1,F
+44,Men 15-18 50yd Breast,1,1,F
+45,Women 15-18 50yd Breast,1,1,F
+46,Boys 8&U 25yd Fly,1,1,F
+47,Girls 8&U 25yd Fly,1,1,F
+48,Boys 9-10 25yd Fly,1,1,F
+49,Girls 9-10 25yd Fly,2,1,F
+50,Boys 11-12 50yd Fly,1,1,F
+51,Girls 11-12 50yd Fly,2,1,F
+52,Boys 13-14 50yd Fly,1,1,F
+53,Girls 13-14 50yd Fly,2,1,F
+54,Men 15-18 50yd Fly,2,1,F
+55,Women 15-18 50yd Fly,1,1,F
+56,Men Open 150yd Free Relay,1,1,F
+57,Women Open 150yd Free Relay,1,1,F
