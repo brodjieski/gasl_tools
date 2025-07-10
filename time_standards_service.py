@@ -269,6 +269,262 @@ class TimeStandardsService:
         
         return times_df
 
+    def get_meet_duration_with_current_standards(self, df, season, current_times, heat_time, event_delay, team_assignments=None):
+        """Estimate meet duration using current time standards for qualification and timing."""
+        # Debug: check what columns we have
+        print(f"DEBUG: Available columns in df: {list(df.columns)}")
+        print(f"DEBUG: Sample of first few rows:")
+        print(df.head())
+        
+        grouped = df.groupby(['age_group', 'distance', 'stroke'])
+        
+        event_names = []
+        gold_qualifiers = []
+        gold_heats = []
+        silver_qualifiers = []
+        silver_heats = []
+        bronze_qualifiers = []
+        bronze_heats = []
+        gold_event_times = []
+        silver_event_times = []
+        bronze_event_times = []
+        
+        heat_time_hundredths = heat_time * 100
+        event_delay_hundredths = event_delay * 100
+        
+        # First, qualify swimmers using current standards
+        entries = pd.DataFrame()
+        
+        for name, group in grouped:
+            event_name = f"{name[0]}_{name[1]}_{name[2]}"
+            
+            # Use current standards for qualification
+            _row = current_times.index[current_times['Event_name'] == event_name].tolist()
+            if not _row:
+                continue
+                
+            _gold = current_times.loc[_row, "gold_y"]
+            _silver = current_times.loc[_row, "silver_y"]
+            
+            _gold_hundredths = convert_time_to_hundredths(_gold.item())
+            _silver_hundredths = convert_time_to_hundredths(_silver.item())
+            
+            # Qualify swimmers based on current standards
+            _gold_peeps = group[group['converted_hundredths'] <= _gold_hundredths]
+            _silver_peeps = group[(group['converted_hundredths'] <= _silver_hundredths) & 
+                                 (group['converted_hundredths'] >= _gold_hundredths)]
+            _bronze_peeps = group[group['converted_hundredths'] > _silver_hundredths]
+            
+            _gold_entries = _gold_peeps.assign(qualified_meet='GOLD')
+            _silver_entries = _silver_peeps.assign(qualified_meet='SILVER')
+            
+            if "15-18" in event_name:
+                _bronze_entries = _bronze_peeps.assign(qualified_meet='SILVER')
+            else:
+                _bronze_entries = _bronze_peeps.assign(qualified_meet='BRONZE')
+            
+            entries = pd.concat([entries, _gold_entries, _silver_entries, _bronze_entries], ignore_index=True)
+        
+        # Clean up entries
+        cleaned_up_entries = self.dedup_entries(entries)
+        
+        # Now calculate duration estimates using current standards
+        grouped_qualified = cleaned_up_entries.groupby(['age_group', 'distance', 'stroke'])
+        
+        for name, group in grouped_qualified:
+            event_name = f"{name[0]}_{name[1]}_{name[2]}"
+            
+            # Use current standards for timing calculations
+            _row = current_times.index[current_times['Event_name'] == event_name].tolist()
+            if not _row:
+                continue
+                
+            _gold = current_times.loc[_row, "gold_y"]
+            _silver = current_times.loc[_row, "silver_y"]
+            
+            _gold_hundredths = convert_time_to_hundredths(_gold.item())
+            _silver_hundredths = convert_time_to_hundredths(_silver.item())
+            
+            gold_count = (group['qualified_meet'] == "GOLD").sum()
+            silver_count = (group['qualified_meet'] == "SILVER").sum()
+            bronze_count = (group['qualified_meet'] == "BRONZE").sum()
+            
+            _gold_heats = math.ceil(gold_count / 6)
+            _silver_heats = math.ceil(silver_count / 6)
+            _bronze_heats = math.ceil(bronze_count / 6)
+            
+            event_names.append(event_name)
+            gold_qualifiers.append(gold_count)
+            silver_qualifiers.append(silver_count)
+            bronze_qualifiers.append(bronze_count)
+            gold_heats.append(_gold_heats)
+            silver_heats.append(_silver_heats)
+            bronze_heats.append(_bronze_heats)
+            
+            gold_event_times.append(_gold_heats * (_gold_hundredths + heat_time_hundredths) + event_delay_hundredths)
+            silver_event_times.append(_silver_heats * (_silver_hundredths + heat_time_hundredths) + event_delay_hundredths)
+            bronze_event_times.append(_bronze_heats * (_silver_hundredths + heat_time_hundredths) + event_delay_hundredths)
+        
+        # Create detailed event breakdown
+        times_df = pd.DataFrame({
+            'Event_name': event_names,
+            f'gold_qualifiers-{season}': gold_qualifiers,
+            f'gold_heats-{season}': gold_heats,
+            f'gold_est_duration-{season}': gold_event_times,
+            f'silver_qualifiers-{season}': silver_qualifiers,
+            f'silver_heats-{season}': silver_heats,
+            f'silver_est_duration-{season}': silver_event_times,
+            f'bronze_qualifiers-{season}': bronze_qualifiers,
+            f'bronze_heats-{season}': bronze_heats,
+            f'bronze_est_duration-{season}': bronze_event_times
+        })
+        
+        # Calculate total meet durations
+        total_gold_duration = sum(gold_event_times) if gold_event_times else 0
+        total_silver_duration = sum(silver_event_times) if silver_event_times else 0
+        total_bronze_duration = sum(bronze_event_times) if bronze_event_times else 0
+        
+        # Calculate total qualifiers
+        total_gold_qualifiers = sum(gold_qualifiers) if gold_qualifiers else 0
+        total_silver_qualifiers = sum(silver_qualifiers) if silver_qualifiers else 0
+        total_bronze_qualifiers = sum(bronze_qualifiers) if bronze_qualifiers else 0
+        
+        # Create meet summary based on team assignments
+        if team_assignments:
+            # Calculate duration for specific team assignments
+            meet_summary = self._calculate_meet_summary_with_assignments(
+                cleaned_up_entries, current_times, heat_time, event_delay, team_assignments
+            )
+        else:
+            # Default: split Silver and Bronze meets in half
+            # Convert to regular Python ints for JSON serialization
+            silver_meet_duration = int(total_silver_duration // 2)
+            bronze_meet_duration = int(total_bronze_duration // 2)
+            silver_meet_qualifiers = int(total_silver_qualifiers // 2)
+            bronze_meet_qualifiers = int(total_bronze_qualifiers // 2)
+            
+            meet_summary = {
+                'gold_meet': {
+                    'total_qualifiers': int(total_gold_qualifiers),
+                    'total_duration_hundredths': int(total_gold_duration),
+                    'total_duration_formatted': convert_hundredths_to_time(total_gold_duration)
+                },
+                'silver_meet_1': {
+                    'total_qualifiers': silver_meet_qualifiers,
+                    'total_duration_hundredths': silver_meet_duration,
+                    'total_duration_formatted': convert_hundredths_to_time(silver_meet_duration)
+                },
+                'silver_meet_2': {
+                    'total_qualifiers': silver_meet_qualifiers,
+                    'total_duration_hundredths': silver_meet_duration,
+                    'total_duration_formatted': convert_hundredths_to_time(silver_meet_duration)
+                },
+                'bronze_meet_1': {
+                    'total_qualifiers': bronze_meet_qualifiers,
+                    'total_duration_hundredths': bronze_meet_duration,
+                    'total_duration_formatted': convert_hundredths_to_time(bronze_meet_duration)
+                },
+                'bronze_meet_2': {
+                    'total_qualifiers': bronze_meet_qualifiers,
+                    'total_duration_hundredths': bronze_meet_duration,
+                    'total_duration_formatted': convert_hundredths_to_time(bronze_meet_duration)
+                }
+            }
+        
+        return {
+            'times_df': times_df,
+            'meet_summary': meet_summary,
+            'season': season,
+            'entries': cleaned_up_entries
+        }
+
+    def _calculate_meet_summary_with_assignments(self, entries, current_times, heat_time, event_delay, team_assignments):
+        """Calculate meet durations based on specific team assignments."""
+        heat_time_hundredths = heat_time * 100
+        event_delay_hundredths = event_delay * 100
+        
+        meet_summary = {}
+        
+        # Calculate Gold meet (all Gold qualifiers)
+        gold_entries = entries[entries['qualified_meet'] == 'GOLD']
+        gold_duration, gold_qualifiers = self._calculate_meet_duration_for_entries(
+            gold_entries, current_times, heat_time_hundredths, event_delay_hundredths
+        )
+        
+        meet_summary['gold_meet'] = {
+            'total_qualifiers': int(gold_qualifiers),
+            'total_duration_hundredths': int(gold_duration),
+            'total_duration_formatted': convert_hundredths_to_time(gold_duration)
+        }
+        
+        # Calculate Silver and Bronze meets based on team assignments
+        meets = {
+            'silver_meet_1': ('SILVER', team_assignments.get('silver1', [])),
+            'silver_meet_2': ('SILVER', team_assignments.get('silver2', [])),
+            'bronze_meet_1': ('BRONZE', team_assignments.get('bronze1', [])),
+            'bronze_meet_2': ('BRONZE', team_assignments.get('bronze2', []))
+        }
+        
+        for meet_name, (qualification_level, assigned_teams) in meets.items():
+            if assigned_teams:
+                # Filter entries by qualification level and assigned teams
+                meet_entries = entries[
+                    (entries['qualified_meet'] == qualification_level) &
+                    (entries['team_abbr'].isin(assigned_teams))
+                ]
+            else:
+                # If no teams assigned, use empty entries
+                meet_entries = entries[entries['qualified_meet'] == 'DUMMY']  # Empty result
+            
+            duration, qualifiers = self._calculate_meet_duration_for_entries(
+                meet_entries, current_times, heat_time_hundredths, event_delay_hundredths
+            )
+            
+            meet_summary[meet_name] = {
+                'total_qualifiers': int(qualifiers),
+                'total_duration_hundredths': int(duration),
+                'total_duration_formatted': convert_hundredths_to_time(duration),
+                'assigned_teams': assigned_teams
+            }
+        
+        return meet_summary
+
+    def _calculate_meet_duration_for_entries(self, entries, current_times, heat_time_hundredths, event_delay_hundredths):
+        """Calculate total duration for a set of entries."""
+        if len(entries) == 0:
+            return 0, 0
+        
+        grouped = entries.groupby(['age_group', 'distance', 'stroke'])
+        total_duration = 0
+        total_qualifiers = len(entries)
+        
+        for name, group in grouped:
+            event_name = f"{name[0]}_{name[1]}_{name[2]}"
+            
+            # Get current standards for timing
+            _row = current_times.index[current_times['Event_name'] == event_name].tolist()
+            if not _row:
+                continue
+                
+            # Use the qualification level's time standard
+            qual_level = group['qualified_meet'].iloc[0]
+            if qual_level == 'GOLD':
+                time_standard = current_times.loc[_row, "gold_y"]
+            else:  # SILVER or BRONZE
+                time_standard = current_times.loc[_row, "silver_y"]
+            
+            time_hundredths = convert_time_to_hundredths(time_standard.item())
+            
+            # Calculate heats (6 swimmers per heat)
+            swimmer_count = len(group)
+            heats = math.ceil(swimmer_count / 6)
+            
+            # Calculate event duration
+            event_duration = heats * (time_hundredths + heat_time_hundredths) + event_delay_hundredths
+            total_duration += event_duration
+        
+        return total_duration, total_qualifiers
+
     def get_qualifiers_summary(self, df, proposed_times, current_times, heat_time, event_time):
         """Generate qualifier summary and meet duration estimates."""
         grouped = df.groupby(['age_group', 'distance', 'stroke'])

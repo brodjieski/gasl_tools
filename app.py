@@ -27,6 +27,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 from time_standards_service import TimeStandardsService
+from utils import add_event_names_column, convert_time_to_hundredths
 import pandas as pd
 import tempfile
 
@@ -1216,6 +1217,159 @@ def estimate_meet_duration():
             })
     
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/current-meet-duration', methods=['GET'])
+def current_meet_duration():
+    """Render the current meet duration estimation page."""
+    return render_template('current-meet-duration.html')
+
+
+@app.route('/estimate-current-meet-duration', methods=['POST'])
+@limiter.limit("5 per minute")
+def estimate_current_meet_duration():
+    """Estimate meet duration using current standards."""
+    print("DEBUG: Starting estimate_current_meet_duration")
+    try:
+        # Sanitize and validate input parameters
+        heat_time = sanitize_input(
+            request.form.get('heat_time', Config.DEFAULT_HEAT_TIME), 
+            'int'
+        )
+        event_time = sanitize_input(
+            request.form.get('event_time', Config.DEFAULT_EVENT_TIME), 
+            'int'
+        )
+        
+        # Check if data files are present
+        if 'data_files' not in request.files:
+            return jsonify({'error': 'Missing required data files'}), 400
+        
+        data_files = request.files.getlist('data_files')
+        
+        # Use local current standards file
+        standards_filepath = os.path.join(os.getcwd(), 'current_standards.csv')
+        if not os.path.exists(standards_filepath):
+            # Try alternative name
+            standards_filepath = os.path.join(os.getcwd(), 'current_standards')
+            if not os.path.exists(standards_filepath):
+                return jsonify({'error': 'Current standards file not found in application directory'}), 400
+        
+        # Process files and estimate duration
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create data directory
+            data_dir = os.path.join(temp_dir, 'data')
+            os.makedirs(data_dir)
+            
+            # Save data files
+            data_file_paths = []
+            for file in data_files:
+                if file and allowed_file(file.filename):
+                    filename = secure_filename(file.filename)
+                    filepath = os.path.join(data_dir, filename)
+                    file.save(filepath)
+                    data_file_paths.append(filepath)
+            
+            if not data_file_paths:
+                return jsonify({'error': 'No valid data files uploaded'}), 400
+            
+            # Load current standards using the metadata-aware function
+            from utils import read_csv_with_metadata
+            current_standards = read_csv_with_metadata(standards_filepath)
+            print(f"DEBUG: Current standards columns: {list(current_standards.columns)}")
+            
+            # Check if current_standards already has Event_name column
+            if 'Event_name' not in current_standards.columns:
+                # Only add event names if the column doesn't exist
+                current_standards = add_event_names_column(current_standards)
+            else:
+                print("DEBUG: Current standards already has Event_name column")
+            
+            # Use the same data preparation as the original method
+            data_pattern = os.path.join(data_dir, '*.csv')
+            print(f"DEBUG: Loading data from pattern: {data_pattern}")
+            df = service.prepare_data(data_pattern)
+            print(f"DEBUG: Data loaded, shape: {df.shape}")
+            
+            # Debug: check what columns we have
+            available_columns = list(df.columns)
+            print(f"DEBUG: Raw columns after prepare_data: {available_columns}")
+            
+            # Normalize column names like in close_to_pin.py
+            if 'AgeGroup' in df.columns and 'Event' in df.columns:
+                # Swimtopia format - convert columns
+                df = df.assign(
+                    distance=df.Event.str.split(' ', n=1, expand=True)[0],
+                    stroke=df.Event.str.split(' ', n=1, expand=True)[1],
+                    age_group=df.AgeGroup.astype(str)
+                )
+            elif 'age_group' in df.columns and 'distance' in df.columns and 'stroke' in df.columns:
+                # Already has the required columns - no conversion needed
+                pass
+            else:
+                return jsonify({
+                    'error': f'Missing required columns. Available columns: {available_columns}. Expected: AgeGroup, Event (or age_group, distance, stroke)'
+                }), 400
+            
+            # Add event names - converted_hundredths should already exist in the source data
+            df = add_event_names_column(df)
+            
+            # Verify that converted_hundredths column exists
+            if 'converted_hundredths' not in df.columns:
+                return jsonify({'error': 'converted_hundredths column not found in data. Please use gasl_top_times.csv format.'}), 400
+            
+            # Process all swimmers together (ignore dates - just estimate for current data)
+            print(f"DEBUG: Processing all data together, shape: {df.shape}")
+            print(f"DEBUG: Columns: {list(df.columns)}")
+            
+            # Check for team assignments
+            team_assignments = None
+            if 'team_assignments' in request.form:
+                import json
+                team_assignments = json.loads(request.form['team_assignments'])
+                print(f"DEBUG: Team assignments: {team_assignments}")
+            
+            # Get duration estimates using current standards for all data
+            duration_result = service.get_meet_duration_with_current_standards(
+                df, 
+                "Current", 
+                current_standards, 
+                heat_time, 
+                event_time,
+                team_assignments
+            )
+            
+            # Handle NaN values before converting to dict
+            times_df_clean = duration_result['times_df'].fillna('')
+            entries_summary_clean = service.get_team_attendance_summary(duration_result['entries']).fillna(0)
+            
+            # Convert attendance summary to the format expected by JavaScript
+            entries_dict = {}
+            for team in entries_summary_clean.index:
+                entries_dict[team] = entries_summary_clean.loc[team].to_dict()
+            
+            duration_results = [{
+                'season': duration_result['season'],
+                'times_df': times_df_clean.to_dict('records'),
+                'meet_summary': duration_result['meet_summary'],
+                'entries_summary': entries_dict
+            }]
+            
+            return jsonify({
+                'status': 'success',
+                'parameters': {
+                    'heat_time': heat_time,
+                    'event_time': event_time
+                },
+                'duration_estimates': duration_results
+            })
+    
+    except Exception as e:
+        print(f"DEBUG: Exception occurred: {str(e)}")
+        print(f"DEBUG: Exception type: {type(e)}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 

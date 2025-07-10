@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Current Meet Duration Estimator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-nav">
+                <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
+            </div>
+            <h1>⏱️ Current Meet Duration Estimator</h1>
+            <p>Estimate meet duration using current GASL time standards</p>
+        </header>
+
+        <main>
+            <section class="intro-section">
+                <div class="intro-content">
+                    <h2>📋 About Current Meet Duration Estimator</h2>
+                    <p>This tool estimates meet duration based on the current GASL time standards. Upload swimmer data files and configure timing parameters to get estimates for Gold, Silver, and Bronze meet durations along with team attendance summaries.</p>
+                    <p>Export the Top Times report from the GASL swimtopia site for each season you want to analyze. From the GASL League Swimtopia site, go to Reports->Top Times (New). Select a season, the top 250 times, and the correct event template to generate the report. Then export the .csv file for upload.</p>
+                </div>
+            </section>
+            
+            <form id="duration-form" enctype="multipart/form-data">
+                <div class="form-section">
+                    <h2>⚙️ Configuration & Files</h2>
+                    
+                    <!-- Parameters in a compact grid -->
+                    <div class="parameters-grid">
+                        <div class="param-group">
+                            <h3>Meet Timing</h3>
+                            <div class="inline-inputs">
+                                <div class="form-group compact">
+                                    <label for="heat_time">Heat gap (s):</label>
+                                    <input type="number" id="heat_time" name="heat_time" 
+                                           min="1" max="300" value="15" required>
+                                </div>
+                                <div class="form-group compact">
+                                    <label for="event_time">Event gap (s):</label>
+                                    <input type="number" id="event_time" name="event_time" 
+                                           min="1" max="600" value="30" required>
+                                </div>
+                            </div>
+                            <small>Time between heats and events for duration estimates</small>
+                        </div>
+                    </div>
+                    
+                    <!-- File uploads -->
+                    <div class="file-uploads">
+                        <div class="form-group">
+                            <label for="data_files">📈 Swimmer Data (CSV):</label>
+                            <input type="file" id="data_files" name="data_files" 
+                                   accept=".csv" multiple required>
+                            <small>Upload one or more CSV files exported from Swimtopia for each season to analyze.</small>
+                        </div>
+                        
+                        <div class="info-note">
+                            <p><strong>Using Current Standards:</strong> This tool uses the current GASL time standards for both qualification and duration calculations.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="team-assignments" style="display: none;">
+                    <div class="form-section">
+                        <h2>🏊‍♂️ Team Assignments for Silver & Bronze Meets</h2>
+                        <p>Teams are automatically balanced by qualifier counts. Drag-and-drop teams between meets to make adjustments.</p>
+                        
+                        <!-- Quick Assignment Options -->
+                        <div class="quick-assign-section">
+                            <h3>Team Assignments</h3>
+    
+                        </div>
+
+                        <!-- Drag and Drop Assignment -->
+                        <div class="assignment-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+                            <div class="assignment-column">
+                                <h4>🥈 Silver Meet A</h4>
+                                <div id="silver1-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                    <p class="drop-hint">Auto-assigned</p>
+                                </div>
+                            </div>
+                            
+                            <div class="assignment-column">
+                                <h4>🥈 Silver Meet B</h4>
+                                <div id="silver2-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                    <p class="drop-hint">Auto-assigned</p>
+                                </div>
+                            </div>
+                            
+                            <div class="assignment-column">
+                                <h4>🥉 Bronze Meet A</h4>
+                                <div id="bronze1-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                    <p class="drop-hint">Auto-assigned</p>
+                                </div>
+                            </div>
+                            
+                            <div class="assignment-column">
+                                <h4>🥉 Bronze Meet B</h4>
+                                <div id="bronze2-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                    <p class="drop-hint">Auto-assigned</p>
+                                </div>
+                            </div>
+                        </div>
+                         <div class="quick-assign-buttons">
+                                <button type="button" class="btn-secondary" onclick="clearAssignments()">
+                                    Reset
+                                </button>
+                            </div>
+                        <!-- Hidden available teams container for drag/drop functionality -->
+                        <div id="available-teams" class="team-list droppable" style="display: none;">
+                            <!-- Teams will be populated here initially -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" id="submit-btn" class="btn-primary">
+                        <span class="btn-text">Estimate Duration</span>
+                        <span class="loading-spinner" style="display: none;">
+                            <div class="spinner"></div>
+                            Processing...
+                        </span>
+                    </button>
+                    <button type="reset" class="btn-secondary">Reset Form</button>
+                </div>
+            </form>
+
+            <div id="results-section" style="display: none;">
+                <h2>Duration Estimates</h2>
+                <div id="results-content"></div>
+            </div>
+
+            <div id="error-section" style="display: none;">
+                <h2>Error</h2>
+                <div id="error-content" class="error-message"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 Greater Annapolis Swim League</p>
+        </footer>
+    </div>
+
+    <script>
+        let currentData = null;
+        let availableTeams = [];
+
+        document.getElementById('duration-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const loadingSpinner = submitBtn.querySelector('.loading-spinner');
+            const resultsSection = document.getElementById('results-section');
+            const errorSection = document.getElementById('error-section');
+            
+            // Show loading state
+            btnText.style.display = 'none';
+            loadingSpinner.style.display = 'inline-flex';
+            submitBtn.disabled = true;
+            
+            // Hide previous results
+            resultsSection.style.display = 'none';
+            errorSection.style.display = 'none';
+            
+            const formData = new FormData(this);
+            
+            // Add team assignments if they exist
+            const teamAssignments = getTeamAssignments();
+            if (teamAssignments) {
+                formData.append('team_assignments', JSON.stringify(teamAssignments));
+            }
+            
+            fetch('/estimate-current-meet-duration', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentData = data;
+                    displayResults(data);
+                    showTeamAssignments(data);
+                } else {
+                    showError(data.error || 'An error occurred');
+                }
+            })
+            .catch(error => {
+                showError('Network error: ' + error.message);
+            })
+            .finally(() => {
+                // Reset loading state
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            });
+        });
+        
+        function displayResults(data) {
+            const resultsContent = document.getElementById('results-content');
+            const resultsSection = document.getElementById('results-section');
+            
+            let html = '<div class="results-overview">';
+            html += '<h3>Parameters Used</h3>';
+            html += '<ul>';
+            html += `<li>Heat gap: ${data.parameters.heat_time} seconds</li>`;
+            html += `<li>Event gap: ${data.parameters.event_time} seconds</li>`;
+            html += '</ul>';
+            html += '</div>';
+            
+            // Display results for each season
+            data.duration_estimates.forEach(season => {
+                html += `<div class="season-results">`;
+                html += `<h3>Season ${season.season}</h3>`;
+                
+                // Meet duration summary
+                if (season.meet_summary) {
+                    html += '<h4>Meet Duration Estimates</h4>';
+                    html += '<div class="table-container">';
+                    html += '<table class="results-table">';
+                    html += '<thead><tr>';
+                    html += '<th>Meet Type</th>';
+                    html += '<th>Total Qualifiers</th>';
+                    html += '<th>Estimated Duration</th>';
+                    html += '</tr></thead><tbody>';
+                    
+                    const meets = [
+                        { name: 'Gold Meet', data: season.meet_summary.gold_meet },
+                        { name: 'Silver Meet A', data: season.meet_summary.silver_meet_1 },
+                        { name: 'Silver Meet B', data: season.meet_summary.silver_meet_2 },
+                        { name: 'Bronze Meet A', data: season.meet_summary.bronze_meet_1 },
+                        { name: 'Bronze Meet B', data: season.meet_summary.bronze_meet_2 }
+                    ];
+                    
+                    meets.forEach(meet => {
+                        html += '<tr>';
+                        html += `<td><strong>${meet.name}</strong></td>`;
+                        html += `<td>${meet.data.total_qualifiers}</td>`;
+                        html += `<td>${meet.data.total_duration_formatted}</td>`;
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    html += '</div>';
+                }
+                
+                // Event breakdown (collapsible)
+                if (season.times_df && season.times_df.length > 0) {
+                    html += '<details>';
+                    html += '<summary><h4 style="display: inline;">Event Breakdown (Click to expand)</h4></summary>';
+                    html += '<div class="table-container">';
+                    html += '<table class="results-table">';
+                    html += '<thead><tr>';
+                    html += '<th>Event</th>';
+                    html += '<th>Gold Qualifiers</th>';
+                    html += '<th>Gold Heats</th>';
+                    html += '<th>Gold Duration</th>';
+                    html += '<th>Silver Qualifiers</th>';
+                    html += '<th>Silver Heats</th>';
+                    html += '<th>Silver Duration</th>';
+                    html += '<th>Bronze Qualifiers</th>';
+                    html += '<th>Bronze Heats</th>';
+                    html += '<th>Bronze Duration</th>';
+                    html += '</tr></thead><tbody>';
+                    
+                    season.times_df.forEach(row => {
+                        html += '<tr>';
+                        html += `<td>${row.Event_name}</td>`;
+                        html += `<td>${row[`gold_qualifiers-${season.season}`] || 0}</td>`;
+                        html += `<td>${row[`gold_heats-${season.season}`] || 0}</td>`;
+                        html += `<td>${formatTime(row[`gold_est_duration-${season.season}`])}</td>`;
+                        html += `<td>${row[`silver_qualifiers-${season.season}`] || 0}</td>`;
+                        html += `<td>${row[`silver_heats-${season.season}`] || 0}</td>`;
+                        html += `<td>${formatTime(row[`silver_est_duration-${season.season}`])}</td>`;
+                        html += `<td>${row[`bronze_qualifiers-${season.season}`] || 0}</td>`;
+                        html += `<td>${row[`bronze_heats-${season.season}`] || 0}</td>`;
+                        html += `<td>${formatTime(row[`bronze_est_duration-${season.season}`])}</td>`;
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    html += '</div>';
+                    html += '</details>';
+                }
+                
+                // Team attendance summary
+                if (season.entries_summary) {
+                    html += '<h4>Team Attendance Summary</h4>';
+                    html += '<div class="table-container">';
+                    html += '<table class="results-table">';
+                    html += '<thead><tr><th>Team</th><th>Gold</th><th>Silver</th><th>Bronze</th><th>Total</th></tr></thead><tbody>';
+                    
+                    // Sort teams alphabetically, but put "Total" at the end
+                    const sortedTeams = Object.entries(season.entries_summary).sort(([teamA], [teamB]) => {
+                        if (teamA === 'Total') return 1;
+                        if (teamB === 'Total') return -1;
+                        return teamA.localeCompare(teamB);
+                    });
+                    
+                    sortedTeams.forEach(([team, counts]) => {
+                        const rowClass = team === 'Total' ? ' style="font-weight: bold; border-top: 2px solid #333;"' : '';
+                        html += `<tr${rowClass}>`;
+                        html += `<td>${team}</td>`;
+                        html += `<td>${counts.GOLD || 0}</td>`;
+                        html += `<td>${counts.SILVER || 0}</td>`;
+                        html += `<td>${counts.BRONZE || 0}</td>`;
+                        html += `<td>${counts.Total || 0}</td>`;
+                        html += '</tr>';
+                    });
+                    
+                    html += '</tbody></table>';
+                    html += '</div>';
+                }
+                
+                html += '</div>';
+            });
+            
+            resultsContent.innerHTML = html;
+            resultsSection.style.display = 'block';
+        }
+        
+        function formatTime(hundredths) {
+            if (!hundredths || hundredths === '' || hundredths === 0) return '0:00.00';
+            
+            const totalSeconds = hundredths / 100;
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            
+            return `${minutes}:${seconds.toFixed(2).padStart(5, '0')}`;
+        }
+        
+        function showError(message) {
+            const errorContent = document.getElementById('error-content');
+            const errorSection = document.getElementById('error-section');
+            
+            errorContent.textContent = message;
+            errorSection.style.display = 'block';
+        }
+        
+        function showTeamAssignments(data) {
+            // Extract teams from the first season's entries_summary
+            const season = data.duration_estimates[0];
+            if (!season.entries_summary) return;
+            
+            availableTeams = Object.keys(season.entries_summary).filter(team => team !== 'Total');
+            
+            // Show the team assignment section
+            document.getElementById('team-assignments').style.display = 'block';
+            
+            // Populate available teams list
+            const availableContainer = document.getElementById('available-teams');
+            availableContainer.innerHTML = '';
+            
+            availableTeams.forEach(team => {
+                const teamElement = document.createElement('div');
+                teamElement.className = 'team-item draggable';
+                teamElement.draggable = true;
+                teamElement.textContent = team;
+                teamElement.dataset.team = team;
+                teamElement.addEventListener('dragstart', handleDragStart);
+                availableContainer.appendChild(teamElement);
+            });
+            
+            // Setup drag and drop for all droppable areas
+            setupDropZones();
+            
+            // Auto-balance teams on initial display (after DOM update)
+            setTimeout(() => {
+                assignBalanced();
+                // Automatically recalculate with team assignments
+                setTimeout(() => {
+                    recalculateWithAssignments();
+                }, 200);
+            }, 100);
+            
+            // Add recalculate button
+            if (!document.getElementById('recalculate-btn')) {
+                const recalculateBtn = document.createElement('button');
+                recalculateBtn.id = 'recalculate-btn';
+                recalculateBtn.type = 'button';
+                recalculateBtn.className = 'btn-secondary';
+                recalculateBtn.textContent = 'Recalculate with Team Assignments';
+                recalculateBtn.addEventListener('click', recalculateWithAssignments);
+                
+                const formActions = document.querySelector('.form-actions');
+                formActions.appendChild(recalculateBtn);
+            }
+        }
+        
+        function getTeamAssignments() {
+            const assignments = {
+                silver1: [],
+                silver2: [],
+                bronze1: [],
+                bronze2: []
+            };
+            
+            // Get teams from each drop zone
+            const zones = ['silver1', 'silver2', 'bronze1', 'bronze2'];
+            zones.forEach(zone => {
+                const container = document.getElementById(`${zone}-teams`);
+                const teamItems = container.querySelectorAll('.team-item');
+                teamItems.forEach(item => {
+                    assignments[zone].push(item.dataset.team);
+                });
+            });
+            
+            return assignments;
+        }
+        
+        // Drag and Drop Functions
+        let draggedElement = null;
+        
+        function handleDragStart(e) {
+            draggedElement = e.target;
+            e.dataTransfer.effectAllowed = 'move';
+        }
+        
+        function setupDropZones() {
+            const dropZones = document.querySelectorAll('.droppable');
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', handleDragOver);
+                zone.addEventListener('drop', handleDrop);
+                zone.addEventListener('dragenter', handleDragEnter);
+                zone.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+        
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+        
+        function handleDragEnter(e) {
+            e.preventDefault();
+            e.target.classList.add('drag-over');
+        }
+        
+        function handleDragLeave(e) {
+            e.target.classList.remove('drag-over');
+        }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            e.target.classList.remove('drag-over');
+            
+            if (draggedElement) {
+                // Remove hint text if present
+                const hints = e.target.querySelectorAll('.drop-hint');
+                hints.forEach(hint => hint.style.display = 'none');
+                
+                // Move the team element
+                e.target.appendChild(draggedElement);
+                draggedElement = null;
+            }
+        }
+        
+        // Quick Assignment Functions
+        function assignBalanced() {
+            // Clear all assignments first
+            clearAssignmentsWithoutRebalance();
+            
+            if (!currentData || !currentData.duration_estimates[0] || !currentData.duration_estimates[0].entries_summary) {
+                // Fallback to simple alternating if no data available
+                assignSimpleAlternating();
+                return;
+            }
+            
+            const entriesSummary = currentData.duration_estimates[0].entries_summary;
+            
+            // Get Silver and Bronze qualifier counts for each team
+            const teamQualifiers = {};
+            availableTeams.forEach(team => {
+                const teamData = entriesSummary[team];
+                if (teamData) {
+                    teamQualifiers[team] = {
+                        silver: teamData.SILVER || 0,
+                        bronze: teamData.BRONZE || 0
+                    };
+                }
+            });
+            
+            // Balance Silver meets
+            balanceMeetsByQualifiers(teamQualifiers, 'silver', ['silver1-teams', 'silver2-teams']);
+            
+            // Balance Bronze meets  
+            balanceMeetsByQualifiers(teamQualifiers, 'bronze', ['bronze1-teams', 'bronze2-teams']);
+            
+            // Clear available teams since they're all assigned
+            const availableContainer = document.getElementById('available-teams');
+            availableContainer.innerHTML = '<p class="drop-hint">All teams assigned</p>';
+        }
+        
+        function balanceMeetsByQualifiers(teamQualifiers, meetType, containers) {
+            // Sort teams by qualifier count for this meet type (descending)
+            const sortedTeams = [...availableTeams].sort((a, b) => {
+                const aCount = teamQualifiers[a] ? teamQualifiers[a][meetType] : 0;
+                const bCount = teamQualifiers[b] ? teamQualifiers[b][meetType] : 0;
+                return bCount - aCount;
+            });
+            
+            // Distribute teams to balance total qualifiers
+            let meet1Total = 0, meet2Total = 0;
+            
+            sortedTeams.forEach((team, index) => {
+                const teamCount = teamQualifiers[team] ? teamQualifiers[team][meetType] : 0;
+                
+                // Add to the meet with fewer current qualifiers
+                if (meet1Total <= meet2Total) {
+                    moveTeamToContainer(team, containers[0]);
+                    meet1Total += teamCount;
+                } else {
+                    moveTeamToContainer(team, containers[1]);
+                    meet2Total += teamCount;
+                }
+            });
+        }
+        
+        function assignSimpleAlternating() {
+            // Fallback function for simple alternating assignment
+            // Teams qualify for either Silver OR Bronze, not both
+            const silverContainers = ['silver1-teams', 'silver2-teams'];
+            const bronzeContainers = ['bronze1-teams', 'bronze2-teams'];
+            
+            availableTeams.forEach((team, index) => {
+                // Assign to Silver meets
+                moveTeamToContainer(team, silverContainers[index % 2]);
+                // Assign to Bronze meets  
+                moveTeamToContainer(team, bronzeContainers[index % 2]);
+            });
+        }
+        
+        function clearAssignments() {
+            clearAssignmentsWithoutRebalance();
+            // Auto-balance teams again
+            assignBalanced();
+        }
+        
+        function clearAssignmentsWithoutRebalance() {
+            // Move all teams back to available
+            const assignedTeams = document.querySelectorAll('.team-item');
+            const availableContainer = document.getElementById('available-teams');
+            
+            assignedTeams.forEach(team => {
+                availableContainer.appendChild(team);
+            });
+            
+            // Show hint text again
+            const hints = document.querySelectorAll('.drop-hint');
+            hints.forEach(hint => hint.style.display = 'block');
+        }
+        
+        function moveTeamToContainer(teamName, containerId) {
+            const container = document.getElementById(containerId);
+            
+            if (container) {
+                // Create a new team element (since teams can be in multiple meets)
+                const teamElement = document.createElement('div');
+                teamElement.className = 'team-item draggable';
+                teamElement.draggable = true;
+                teamElement.textContent = teamName;
+                teamElement.dataset.team = teamName;
+                teamElement.addEventListener('dragstart', handleDragStart);
+                
+                // Hide hint text
+                const hints = container.querySelectorAll('.drop-hint');
+                hints.forEach(hint => hint.style.display = 'none');
+                container.appendChild(teamElement);
+                
+                // Sort teams alphabetically within the container
+                sortTeamsInContainer(containerId);
+            }
+        }
+        
+        function sortTeamsInContainer(containerId) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+            
+            const teamElements = Array.from(container.querySelectorAll('.team-item'));
+            teamElements.sort((a, b) => a.textContent.localeCompare(b.textContent));
+            
+            // Re-append in sorted order
+            teamElements.forEach(element => container.appendChild(element));
+        }
+        
+        function recalculateWithAssignments() {
+            if (!currentData) return;
+            
+            const teamAssignments = getTeamAssignments();
+            const formData = new FormData(document.getElementById('duration-form'));
+            formData.append('team_assignments', JSON.stringify(teamAssignments));
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const loadingSpinner = submitBtn.querySelector('.loading-spinner');
+            
+            // Show loading state
+            btnText.style.display = 'none';
+            loadingSpinner.style.display = 'inline-flex';
+            submitBtn.disabled = true;
+            
+            fetch('/estimate-current-meet-duration', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    currentData = data;
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'An error occurred');
+                }
+            })
+            .catch(error => {
+                showError('Network error: ' + error.message);
+            })
+            .finally(() => {
+                // Reset loading state
+                btnText.style.display = 'inline';
+                loadingSpinner.style.display = 'none';
+                submitBtn.disabled = false;
+            });
+        }
+    </script>
+</body>
+</html>
