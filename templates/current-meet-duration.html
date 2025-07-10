@@ -12,16 +12,17 @@
             <div class="header-nav">
                 <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
             </div>
-            <h1>⏱️ Current Meet Duration Estimator</h1>
-            <p>Estimate meet duration using current GASL time standards</p>
+            <h1>⏱️ Championship Meet Time Estimator</h1>
+            <p>Estimate championship meet duration using current GASL time standards</p>
         </header>
 
         <main>
             <section class="intro-section">
                 <div class="intro-content">
-                    <h2>📋 About Current Meet Duration Estimator</h2>
-                    <p>This tool estimates meet duration based on the current GASL time standards. Upload swimmer data files and configure timing parameters to get estimates for Gold, Silver, and Bronze meet durations along with team attendance summaries.</p>
-                    <p>Export the Top Times report from the GASL swimtopia site for each season you want to analyze. From the GASL League Swimtopia site, go to Reports->Top Times (New). Select a season, the top 250 times, and the correct event template to generate the report. Then export the .csv file for upload.</p>
+                    <h2>📋 About Championship Meet Time Estimator</h2>
+                    <p>This tool estimates championship meet duration based on the current GASL time standards. Upload the swimmer data file and configure timing parameters to get estimates for Gold, Silver, and Bronze meet durations along with team attendance summaries.</p>
+                    <p>To get the swimmer data file to upload: From the GASL League Swimtopia site, go to Reports->Top Times (New). Select a season, the top 300 times, and the correct event template to generate the report. Select the export to .csv to save the generated report.</p>
+                    <p>Estimations try to take into account a couple of factors by assuming which meet any individual swimmer will attend for by selecting the highest meet they qualify for. This should be used to get a general idea of meet durations.</p>
                 </div>
             </section>
             
@@ -59,7 +60,7 @@
                         </div>
                         
                         <div class="info-note">
-                            <p><strong>Using Current Standards:</strong> This tool uses the current GASL time standards for both qualification and duration calculations.</p>
+                            <p id="standards-info"><strong>Current Standards Adopted</strong> <span id="standards-date">Loading...</span></p>
                         </div>
                     </div>
                 </div>
@@ -148,6 +149,8 @@
     <script>
         let currentData = null;
         let availableTeams = [];
+        // Load standards info on page load
+        loadStandardsInfo();
 
         document.getElementById('duration-form').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -224,7 +227,7 @@
                     html += '<table class="results-table">';
                     html += '<thead><tr>';
                     html += '<th>Meet Type</th>';
-                    html += '<th>Total Qualifiers</th>';
+                    html += '<th>Total Qualified Swims</th>';
                     html += '<th>Estimated Duration</th>';
                     html += '</tr></thead><tbody>';
                     
@@ -625,6 +628,30 @@
                 loadingSpinner.style.display = 'none';
                 submitBtn.disabled = false;
             });
+        }
+        // Load standards modification date
+        async function loadStandardsInfo() {
+            try {
+                const response = await fetch('/standards-info');
+                if (response.ok) {
+                    const data = await response.json();
+                    const dateElement = document.getElementById('standards-date');
+                    if (dateElement) {
+                        dateElement.textContent = data.last_modified;
+                    }
+                } else {
+                    const dateElement = document.getElementById('standards-date');
+                    if (dateElement) {
+                        dateElement.textContent = 'Unknown';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load standards info:', error);
+                const dateElement = document.getElementById('standards-date');
+                if (dateElement) {
+                    dateElement.textContent = 'Unknown';
+                }
+            }
         }
     </script>
 </body>
