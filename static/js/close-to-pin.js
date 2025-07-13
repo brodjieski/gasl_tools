@@ -104,6 +104,31 @@ function setLoadingState(loading) {
     }
 }
 
+// Helper functions to get time values and headers
+function getGoldTime(swimmer) {
+    // Look for Gold Time column with or without units
+    const goldTimeKey = Object.keys(swimmer).find(key => key.startsWith('Gold Time'));
+    return swimmer[goldTimeKey] || '';
+}
+
+function getSilverTime(swimmer) {
+    // Look for Silver Time column with or without units
+    const silverTimeKey = Object.keys(swimmer).find(key => key.startsWith('Silver Time'));
+    return swimmer[silverTimeKey] || '';
+}
+
+function getGoldTimeHeader(swimmers) {
+    if (swimmers.length === 0) return 'Gold Time';
+    const goldTimeKey = Object.keys(swimmers[0]).find(key => key.startsWith('Gold Time'));
+    return goldTimeKey || 'Gold Time';
+}
+
+function getSilverTimeHeader(swimmers) {
+    if (swimmers.length === 0) return 'Silver Time';
+    const silverTimeKey = Object.keys(swimmers[0]).find(key => key.startsWith('Silver Time'));
+    return silverTimeKey || 'Silver Time';
+}
+
 // Results display
 function displayResults(data) {
     const swimmers = data.swimmers;
@@ -132,8 +157,8 @@ function displayResults(data) {
                             <th>Event</th>
                             <th>Best Time</th>
                             <th>Championship Meet</th>
-                            <th>Gold Time</th>
-                            <th>Silver Time</th>
+                            <th>${getGoldTimeHeader(swimmers)}</th>
+                            <th>${getSilverTimeHeader(swimmers)}</th>
                         </tr>
                     </thead>
                     <tbody id="swimmers-table-body">
@@ -147,8 +172,8 @@ function displayResults(data) {
                 <td>${swimmer['Event'] || ''}</td>
                 <td>${swimmer['Best Time'] || ''}</td>
                 <td class="${getQualificationClass(swimmer['Championship Meet'])}">${swimmer['Championship Meet'] || ''}</td>
-                <td>${swimmer['Gold Time'] || ''}</td>
-                <td>${swimmer['Silver Time'] || ''}</td>
+                <td>${getGoldTime(swimmer)}</td>
+                <td>${getSilverTime(swimmer)}</td>
             </tr>
         `;
     });

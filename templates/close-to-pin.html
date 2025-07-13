@@ -30,9 +30,20 @@
                     
                     <div class="form-group">
                         <label for="best_times_file">📈 Best Times File (CSV):</label>
-                        <input type="file" id="best_times_file" name="best_times_file" 
-                               accept=".csv" required>
-                        <small>Upload swimmer best times file exported from Swimtopia (Reports -> Best Times)</small>
+                        <div class="file-upload-row">
+                            <input type="file" id="best_times_file" name="best_times_file" 
+                                   accept=".csv" required>
+                            <div class="units-toggle-compact">
+                                <label class="units-label">📏 Units:</label>
+                                <div class="toggle-switch-compact">
+                                    <input type="radio" id="units-yards" name="units" value="yards" checked>
+                                    <label for="units-yards">Yards</label>
+                                    <input type="radio" id="units-meters" name="units" value="meters">
+                                    <label for="units-meters">Meters</label>
+                                </div>
+                            </div>
+                        </div>
+                        <small>Upload swimmer best times file exported from Swimtopia (Reports -> Best Times). Select the units of the times in your file.</small>
                     </div>
                     
                     <div class="info-note">

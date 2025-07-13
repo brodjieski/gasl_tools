@@ -1402,6 +1402,11 @@ def analyze_close_to_pin():
         
         print(f"DEBUG: Using standards file: {standards_filepath}")
         
+        # Get units parameter from form data (default to 'yards' if not provided)
+        units = request.form.get('units', 'yards')
+        if units not in ['yards', 'meters']:
+            units = 'yards'  # Fallback to yards if invalid value provided
+        
         # Save best times file temporarily
         with tempfile.TemporaryDirectory() as temp_dir:
             print(f"DEBUG: Created temp directory: {temp_dir}")
@@ -1438,7 +1443,8 @@ def analyze_close_to_pin():
             
             result = close_to_pin_service.analyze_close_to_pin(
                 best_times_filepath,
-                standards_filepath
+                standards_filepath,
+                units
             )
             print(f"DEBUG: Analysis completed, result shape: {result.shape}")
             

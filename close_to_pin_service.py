@@ -61,10 +61,14 @@ class CloseToPinService:
         else:
             return f'Bronze ({row["silver_diff"]})'
 
-    def compare_with_standards(self, df):
+    def compare_with_standards(self, df, units='yards'):
         """Compare swimmer times with current standards."""
-        df['gold_hund'] = df['gold_y'].apply(lambda x: convert_time_to_hundredths(x))
-        df['silver_hund'] = df['silver_y'].apply(lambda x: convert_time_to_hundredths(x))
+        # Choose the appropriate time standard columns based on units
+        gold_col = 'gold_y' if units == 'yards' else 'gold_s'
+        silver_col = 'silver_y' if units == 'yards' else 'silver_s'
+        
+        df['gold_hund'] = df[gold_col].apply(lambda x: convert_time_to_hundredths(x))
+        df['silver_hund'] = df[silver_col].apply(lambda x: convert_time_to_hundredths(x))
         
         df['gold_diff_hund'] = df['gold_hund'] - df['ConvertedHundredths']
         df['silver_diff_hund'] = df['silver_hund'] - df['ConvertedHundredths']
@@ -76,11 +80,19 @@ class CloseToPinService:
         df['next_qualifier'] = df.apply(self.determine_next_qualifier, axis=1)
         df['silver_diff_hund'] = df.apply(self.clean_up_events, axis=1)
         
-        df = df.drop(['gold_hund', 'silver_hund', 'gold_diff_hund', 'silver_diff_hund', 'Time', 'ConvertedHundredths'], axis=1)
+        # Drop only the intermediate calculation columns, keep all standard columns
+        columns_to_drop = ['gold_hund', 'silver_hund', 'gold_diff_hund', 'silver_diff_hund', 'ConvertedHundredths']
+        
+        # Only drop columns that exist in the dataframe
+        existing_columns_to_drop = [col for col in columns_to_drop if col in df.columns]
+        if 'Time' in df.columns:
+            existing_columns_to_drop.append('Time')
+        
+        df = df.drop(existing_columns_to_drop, axis=1)
         
         return df.sort_values(['LastName', 'FirstName'], ascending=[True, True])
 
-    def analyze_close_to_pin(self, best_times_file, current_standards_file):
+    def analyze_close_to_pin(self, best_times_file, current_standards_file, units='yards'):
         """Main analysis method for close to pin analysis."""
         # Read the CSV file
         best_times = pd.read_csv(best_times_file)
@@ -108,13 +120,20 @@ class CloseToPinService:
         current_standards = read_csv_with_metadata(current_standards_file)
         # Use our utility to create event names
         current_standards = add_event_names_column(current_standards)
-        current_standards = current_standards.drop(['age_group', 'distance', 'stroke', 'gold_s', 'silver_s'], axis=1)
+        
+        # Keep both yards and meters columns for comparison
+        current_standards = current_standards.drop(['age_group', 'distance', 'stroke'], axis=1)
 
         best_times_with_standards = pd.merge(best_times, current_standards, on='Event_name')
-        compared_times = self.compare_with_standards(best_times_with_standards)
+        compared_times = self.compare_with_standards(best_times_with_standards, units)
         
-        # Column order and renaming
-        col_order = ["LastName", "FirstName", "Event_name", "ConvertedTime", "qualified_for", "gold_y", "silver_y"]
+        # Column order and renaming - use the appropriate columns based on units
+        gold_col = 'gold_y' if units == 'yards' else 'gold_s'
+        silver_col = 'silver_y' if units == 'yards' else 'silver_s'
+        gold_label = f'Gold Time ({"Yards" if units == "yards" else "Meters"})'
+        silver_label = f'Silver Time ({"Yards" if units == "yards" else "Meters"})'
+        
+        col_order = ["LastName", "FirstName", "Event_name", "ConvertedTime", "qualified_for", gold_col, silver_col]
         compared_times = compared_times[col_order]
         compared_times.rename(columns={
             'LastName': 'Last Name', 
@@ -122,8 +141,8 @@ class CloseToPinService:
             'Event_name': 'Event', 
             'ConvertedTime': 'Best Time', 
             'qualified_for': 'Championship Meet', 
-            'gold_y': 'Gold Time', 
-            'silver_y': 'Silver Time'
+            gold_col: gold_label,
+            silver_col: silver_label
         }, inplace=True)
 
         return compared_times
