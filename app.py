@@ -1634,7 +1634,7 @@ def create_close_to_pin_pdf(df):
         
         # Create the PDF document
         doc = SimpleDocTemplate(filepath, pagesize=A4,
-                              rightMargin=72, leftMargin=72,
+                              rightMargin=36, leftMargin=36,
                               topMargin=72, bottomMargin=18)
         
         # Container for the 'Flowable' objects
@@ -1696,9 +1696,8 @@ def create_close_to_pin_pdf(df):
             elif 'Silver Time' in col:
                 silver_col = col
         
-        headers = ['Last Name', 'First Name', 'Event', 'Best Time', 'Championship Meet', 
-                  gold_col if gold_col else 'Gold Time', 
-                  silver_col if silver_col else 'Silver Time']
+        headers = ['Last\nName', 'First\nName', 'Event', 'Best\nTime', 'Championship\nMeet', 
+                  'Gold\nTime', 'Silver\nTime']
         
         # Convert DataFrame to list of lists for the table
         table_data = [headers]
@@ -1714,8 +1713,9 @@ def create_close_to_pin_pdf(df):
                 str(row.get(silver_col, '')) if silver_col else ''
             ])
         
-        # Create the table
-        table = Table(table_data, repeatRows=1)
+        # Create the table with column widths
+        col_widths = [0.8*inch, 0.8*inch, 1.8*inch, 0.8*inch, 1.2*inch, 0.8*inch, 0.8*inch]
+        table = Table(table_data, colWidths=col_widths, repeatRows=1)
         
         # Apply table styling
         table.setStyle(TableStyle([
@@ -1724,12 +1724,13 @@ def create_close_to_pin_pdf(df):
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
             ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-            ('FONTSIZE', (0, 0), (-1, 0), 10),
-            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('FONTSIZE', (0, 0), (-1, 0), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
             
             # Data rows styling
             ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 1), (-1, -1), 8),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
             ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.beige, colors.white]),
             ('GRID', (0, 0), (-1, -1), 1, colors.black),
             
@@ -1740,10 +1741,10 @@ def create_close_to_pin_pdf(df):
             ('ALIGN', (3, 1), (-1, -1), 'CENTER'),
             
             # Add padding
-            ('TOPPADDING', (0, 0), (-1, -1), 6),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-            ('LEFTPADDING', (0, 0), (-1, -1), 6),
-            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 3),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+            ('LEFTPADDING', (0, 0), (-1, -1), 3),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3),
         ]))
         
         # Add color coding for championship meet column
