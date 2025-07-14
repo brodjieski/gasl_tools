@@ -1687,8 +1687,18 @@ def create_close_to_pin_pdf(df):
         elements.append(Spacer(1, 20))
         
         # Prepare table data
-        # Column headers
-        headers = ['Last Name', 'First Name', 'Event', 'Best Time', 'Championship Meet', 'Gold Time', 'Silver Time']
+        # Column headers - find the actual gold and silver time column names
+        gold_col = None
+        silver_col = None
+        for col in df.columns:
+            if 'Gold Time' in col:
+                gold_col = col
+            elif 'Silver Time' in col:
+                silver_col = col
+        
+        headers = ['Last Name', 'First Name', 'Event', 'Best Time', 'Championship Meet', 
+                  gold_col if gold_col else 'Gold Time', 
+                  silver_col if silver_col else 'Silver Time']
         
         # Convert DataFrame to list of lists for the table
         table_data = [headers]
@@ -1700,8 +1710,8 @@ def create_close_to_pin_pdf(df):
                 str(row.get('Event', '')),
                 str(row.get('Best Time', '')),
                 str(row.get('Championship Meet', '')),
-                str(row.get('Gold Time', '')),
-                str(row.get('Silver Time', ''))
+                str(row.get(gold_col, '')) if gold_col else '',
+                str(row.get(silver_col, '')) if silver_col else ''
             ])
         
         # Create the table
