@@ -10,6 +10,64 @@ class CloseToPinService:
 
     def __init__(self):
         pass
+    
+    def merge_with_age_group_mapping(self, best_times, current_standards):
+        """Merge best times with standards, handling age group mappings for certain strokes."""
+        # First try regular merge
+        merged = pd.merge(best_times, current_standards, on='Event_name', how='left')
+        
+        # Find unmatched rows (where standards columns are NaN)
+        unmatched_mask = merged['gold_y'].isna()
+        unmatched_rows = merged[unmatched_mask].copy()
+        
+        if not unmatched_rows.empty:
+            print(f"DEBUG: Found {len(unmatched_rows)} unmatched rows, attempting age group mapping")
+            
+            # For unmatched rows, try alternative age group mappings
+            for idx, row in unmatched_rows.iterrows():
+                original_event_name = row['Event_name']
+                print(f"DEBUG: Trying to match event: {original_event_name}")
+                
+                # Parse the event name to get components
+                parts = original_event_name.split('_')
+                if len(parts) >= 3:
+                    age_group, distance, stroke = parts[0], parts[1], parts[2]
+                    
+                    # Handle Boys 7-8 -> Boys 8 & Under mapping for Breaststroke and Butterfly
+                    if age_group == "Boys 7-8" and stroke in ["Breaststroke", "Butterfly"]:
+                        alternative_event_name = f"Boys 8 & Under_{distance}_{stroke}"
+                        print(f"DEBUG: Trying alternative event name: {alternative_event_name}")
+                        
+                        # Look up the alternative event in standards
+                        standard_match = current_standards[current_standards['Event_name'] == alternative_event_name]
+                        if not standard_match.empty:
+                            print(f"DEBUG: Found match for {alternative_event_name}")
+                            # Update the merged row with the standard values AND the correct event name
+                            merged.loc[idx, 'Event_name'] = alternative_event_name
+                            for col in ['gold_y', 'gold_s', 'silver_y', 'silver_s']:
+                                if col in standard_match.columns:
+                                    merged.loc[idx, col] = standard_match.iloc[0][col]
+                    
+                    # Handle Girls 7-8 -> Girls 8 & Under mapping for Breaststroke and Butterfly
+                    elif age_group == "Girls 7-8" and stroke in ["Breaststroke", "Butterfly"]:
+                        alternative_event_name = f"Girls 8 & Under_{distance}_{stroke}"
+                        print(f"DEBUG: Trying alternative event name: {alternative_event_name}")
+                        
+                        # Look up the alternative event in standards
+                        standard_match = current_standards[current_standards['Event_name'] == alternative_event_name]
+                        if not standard_match.empty:
+                            print(f"DEBUG: Found match for {alternative_event_name}")
+                            # Update the merged row with the standard values AND the correct event name
+                            merged.loc[idx, 'Event_name'] = alternative_event_name
+                            for col in ['gold_y', 'gold_s', 'silver_y', 'silver_s']:
+                                if col in standard_match.columns:
+                                    merged.loc[idx, col] = standard_match.iloc[0][col]
+        
+        # Remove rows that still don't have standards (couldn't be matched)
+        final_merged = merged.dropna(subset=['gold_y'])
+        print(f"DEBUG: After age group mapping, {len(final_merged)} rows have standards")
+        
+        return final_merged
 
     def convert_hundredths_to_time_diff(self, hundredths):
         """Convert hundredths to time, returning empty string for positive differences."""
@@ -114,7 +172,12 @@ class CloseToPinService:
         
         # Use our utility to create the Event_name field
         best_times = add_event_names_column(best_times)
-        best_times = best_times.drop(['AgeGroup', 'Event', 'Age', 'Date', 'SwimMeet', 'age_group', 'distance', 'stroke'], axis=1)
+        
+        # Preserve name columns while dropping unnecessary ones
+        # Define the columns to drop (only if they exist)
+        columns_to_drop = ['AgeGroup', 'Event', 'Age', 'Date', 'SwimMeet', 'age_group', 'distance', 'stroke']
+        columns_to_drop = [col for col in columns_to_drop if col in best_times.columns]
+        best_times = best_times.drop(columns_to_drop, axis=1)
 
         # Get the current standards, generate event_names
         current_standards = read_csv_with_metadata(current_standards_file)
@@ -124,7 +187,8 @@ class CloseToPinService:
         # Keep both yards and meters columns for comparison
         current_standards = current_standards.drop(['age_group', 'distance', 'stroke'], axis=1)
 
-        best_times_with_standards = pd.merge(best_times, current_standards, on='Event_name')
+        # Handle special age group mappings for certain strokes
+        best_times_with_standards = self.merge_with_age_group_mapping(best_times, current_standards)
         compared_times = self.compare_with_standards(best_times_with_standards, units)
         
         # Column order and renaming - use the appropriate columns based on units
@@ -133,16 +197,53 @@ class CloseToPinService:
         gold_label = f'Gold Time ({"Yards" if units == "yards" else "Meters"})'
         silver_label = f'Silver Time ({"Yards" if units == "yards" else "Meters"})'
         
-        col_order = ["LastName", "FirstName", "Event_name", "ConvertedTime", "qualified_for", gold_col, silver_col]
+        # Find name columns - handle different possible column names from Swimtopia
+        last_name_col = None
+        first_name_col = None
+        
+        # Check for different possible name column formats
+        for col in compared_times.columns:
+            if col.lower() in ['lastname', 'last_name', 'last name', 'swimmer_last', 'lname']:
+                last_name_col = col
+            elif col.lower() in ['firstname', 'first_name', 'first name', 'swimmer_first', 'fname']:
+                first_name_col = col
+        
+        # Debug: Print available columns if name columns are missing
+        if not last_name_col or not first_name_col:
+            print(f"DEBUG: Available columns in data: {list(compared_times.columns)}")
+            print(f"DEBUG: Found last_name_col: {last_name_col}, first_name_col: {first_name_col}")
+        
+        # Create the column order, handling missing name columns
+        col_order = []
+        if last_name_col:
+            col_order.append(last_name_col)
+        if first_name_col:
+            col_order.append(first_name_col)
+        col_order.extend(["Event_name", "ConvertedTime", "qualified_for", gold_col, silver_col])
+        
+        # Only include columns that actually exist
+        col_order = [col for col in col_order if col in compared_times.columns]
         compared_times = compared_times[col_order]
-        compared_times.rename(columns={
-            'LastName': 'Last Name', 
-            'FirstName': 'First Name', 
+        
+        # Clean up Event_name column - replace underscores with spaces
+        if 'Event_name' in compared_times.columns:
+            compared_times['Event_name'] = compared_times['Event_name'].str.replace('_', ' ')
+        
+        # Build rename mapping
+        rename_mapping = {
             'Event_name': 'Event', 
             'ConvertedTime': 'Best Time', 
             'qualified_for': 'Championship Meet', 
             gold_col: gold_label,
             silver_col: silver_label
-        }, inplace=True)
+        }
+        
+        # Add name column renames if they exist
+        if last_name_col:
+            rename_mapping[last_name_col] = 'Last Name'
+        if first_name_col:
+            rename_mapping[first_name_col] = 'First Name'
+        
+        compared_times.rename(columns=rename_mapping, inplace=True)
 
         return compared_times

@@ -1669,14 +1669,14 @@ def create_close_to_pin_pdf(df):
         elements.append(Spacer(1, 20))
         
         # Add summary statistics
-        total_swimmers = len(df)
+        total_events = len(df)
         gold_qualifiers = len(df[df['Championship Meet'].str.contains('Gold', na=False)])
         silver_qualifiers = len(df[df['Championship Meet'].str.contains('Silver', na=False)])
         bronze_qualifiers = len(df[df['Championship Meet'].str.contains('Bronze', na=False)])
         
         summary_text = f"""
         <b>Summary Statistics:</b><br/>
-        • Total Swimmers Analyzed: {total_swimmers}<br/>
+        • Events Analyzed: {total_events}<br/>
         • Gold Meet Qualifiers: {gold_qualifiers}<br/>
         • Silver Meet Qualifiers: {silver_qualifiers}<br/>
         • Bronze Meet Qualifiers: {bronze_qualifiers}<br/>
