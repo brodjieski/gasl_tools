@@ -41,9 +41,9 @@ def convert_hundredths_to_time(hundredths):
     hundredths = int((total_seconds - minutes * 60 - seconds) * 100)
     if hours > 0:
         if negative:
-            return f"-{hours:02}:{int(minutes % 60)}:{seconds:02}"
+            return f"-{hours:02}:{int(minutes % 60):02}:{seconds:02}"
         else:
-            return f"{hours:02}:{int(minutes % 60)}:{seconds:02}"
+            return f"{hours:02}:{int(minutes % 60):02}:{seconds:02}"
     else:
         if negative:
             return f"-{minutes:02}:{seconds:02}.{hundredths:02}"

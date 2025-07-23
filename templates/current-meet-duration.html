@@ -12,17 +12,16 @@
             <div class="header-nav">
                 <a href="{{ url_for('home') }}" class="back-link">← Back to GASL Tools</a>
             </div>
-            <h1>⏱️ Championship Meet Time Estimator</h1>
-            <p>Estimate championship meet duration using current GASL time standards</p>
+            <h1>⏱️ Current Meet Duration Estimator</h1>
+            <p>Estimate meet duration using current GASL time standards</p>
         </header>
 
         <main>
             <section class="intro-section">
                 <div class="intro-content">
-                    <h2>📋 About Championship Meet Time Estimator</h2>
-                    <p>This tool estimates championship meet duration based on the current GASL time standards. Upload the swimmer data file and configure timing parameters to get estimates for Gold, Silver, and Bronze meet durations along with team attendance summaries.</p>
-                    <p>To get the swimmer data file to upload: From the GASL League Swimtopia site, go to Reports->Top Times (New). Select a season, the top 300 times, and the correct event template to generate the report. Select the export to .csv to save the generated report.</p>
-                    <p>Estimations try to take into account a couple of factors by assuming which meet any individual swimmer will attend for by selecting the highest meet they qualify for. This should be used to get a general idea of meet durations.</p>
+                    <h2>📋 About Current Meet Duration Estimator</h2>
+                    <p>This tool estimates meet duration based on the current GASL time standards. Upload swimmer data files and configure timing parameters to get estimates for Gold, Silver, and Bronze meet durations along with team attendance summaries.</p>
+                    <p>Export the Top Times report from the GASL swimtopia site for each season you want to analyze. From the GASL League Swimtopia site, go to Reports->Top Times (New). Select a season, the top 250 times, and the correct event template to generate the report. Then export the .csv file for upload.</p>
                 </div>
             </section>
             
@@ -60,67 +59,113 @@
                         </div>
                         
                         <div class="info-note">
-                            <p id="standards-info"><strong>Current Standards Adopted</strong> <span id="standards-date">Loading...</span></p>
+                            <p><strong>Using Current Standards:</strong> This tool uses the current GASL time standards for both qualification and duration calculations.</p>
                         </div>
                     </div>
                 </div>
 
                 <div id="team-assignments" style="display: none;">
                     <div class="form-section">
-                        <h2>🏊‍♂️ Team Assignments for Silver & Bronze Meets</h2>
-                        <p>Teams are automatically balanced by qualifier counts. Drag-and-drop teams between meets to make adjustments.</p>
+                        <h2>🏊‍♂️ Host Team Selection for Silver & Bronze Meets</h2>
+                        <p>Select which teams will host each meet. Each team can host multiple meets if needed.</p>
                         
-                        <!-- Quick Assignment Options -->
-                        <div class="quick-assign-section">
-                            <h3>Team Assignments</h3>
-    
+                        <!-- Host Team Selection -->
+                        <div class="host-selection-section">
+                            <h3>Select Host Teams:</h3>
+                            <div class="host-selection-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 1rem;">
+                                <div class="host-group">
+                                    <h4>Silver Meets</h4>
+                                    <div class="form-group">
+                                        <label for="silver-a-host">🥈 Silver A Host:</label>
+                                        <select id="silver-a-host" name="silver_a_host" class="host-selector">
+                                            <option value="">Select Host Team</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="silver-b-host">🥈 Silver B Host:</label>
+                                        <select id="silver-b-host" name="silver_b_host" class="host-selector">
+                                            <option value="">Select Host Team</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="host-group">
+                                    <h4>Bronze Meets</h4>
+                                    <div class="form-group">
+                                        <label for="bronze-a-host">🥉 Bronze A Host:</label>
+                                        <select id="bronze-a-host" name="bronze_a_host" class="host-selector">
+                                            <option value="">Select Host Team</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="bronze-b-host">🥉 Bronze B Host:</label>
+                                        <select id="bronze-b-host" name="bronze_b_host" class="host-selector">
+                                            <option value="">Select Host Team</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="balance-section" style="margin-top: 1.5rem; text-align: center;">
+                                <button type="button" id="balance-meets-btn" class="btn-primary" onclick="balanceMeetsWithHosts()" disabled>
+                                    ⚖️ Balance Meets
+                                </button>
+                                <p style="margin-top: 0.5rem; font-size: 0.9rem; color: #666;">
+                                    Select host teams first, then click to auto-balance remaining teams between meets.
+                                </p>
+                            </div>
                         </div>
 
-                        <!-- Drag and Drop Assignment -->
-                        <div class="assignment-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
-                            <div class="assignment-column">
-                                <h4>🥈 Silver Meet A</h4>
-                                <div id="silver1-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
-                                    <p class="drop-hint">Auto-assigned</p>
+                        <!-- Team Assignment Display -->
+                        <div class="assignment-display" style="display: none; margin-top: 2rem;">
+                            <h3>Current Team Assignments:</h3>
+                            <p style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+                                Drag teams between meets to customize assignments. Host teams are marked and cannot be removed from their meets.
+                            </p>
+                            
+                            
+                            <div class="assignment-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-top: 1rem;">
+                                <div class="assignment-column">
+                                    <h4 id="silver1-title">🥈 Silver Meet A</h4>
+                                    <div id="silver1-teams" class="team-list droppable" style="min-height: 120px; border: 2px solid #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                        <p class="assignment-hint">No teams assigned</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="assignment-column">
+                                    <h4 id="silver2-title">🥈 Silver Meet B</h4>
+                                    <div id="silver2-teams" class="team-list droppable" style="min-height: 120px; border: 2px solid #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                        <p class="assignment-hint">No teams assigned</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="assignment-column">
+                                    <h4 id="bronze1-title">🥉 Bronze Meet A</h4>
+                                    <div id="bronze1-teams" class="team-list droppable" style="min-height: 120px; border: 2px solid #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                        <p class="assignment-hint">No teams assigned</p>
+                                    </div>
+                                </div>
+                                
+                                <div class="assignment-column">
+                                    <h4 id="bronze2-title">🥉 Bronze Meet B</h4>
+                                    <div id="bronze2-teams" class="team-list droppable" style="min-height: 120px; border: 2px solid #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
+                                        <p class="assignment-hint">No teams assigned</p>
+                                    </div>
                                 </div>
                             </div>
                             
-                            <div class="assignment-column">
-                                <h4>🥈 Silver Meet B</h4>
-                                <div id="silver2-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
-                                    <p class="drop-hint">Auto-assigned</p>
-                                </div>
-                            </div>
-                            
-                            <div class="assignment-column">
-                                <h4>🥉 Bronze Meet A</h4>
-                                <div id="bronze1-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
-                                    <p class="drop-hint">Auto-assigned</p>
-                                </div>
-                            </div>
-                            
-                            <div class="assignment-column">
-                                <h4>🥉 Bronze Meet B</h4>
-                                <div id="bronze2-teams" class="team-list droppable" style="min-height: 120px; border: 2px dashed #ccc; border-radius: 8px; padding: 0.5rem; background: #f9f9f9;">
-                                    <p class="drop-hint">Auto-assigned</p>
-                                </div>
-                            </div>
-                        </div>
-                         <div class="quick-assign-buttons">
-                                <button type="button" class="btn-secondary" onclick="clearAssignments()">
-                                    Reset
+                            <div style="text-align: center; margin-top: 1rem;">
+                                <button type="button" id="reset-assignments-btn" class="btn-secondary" onclick="resetToBalanced()">
+                                    🔄 Reset to Balanced
                                 </button>
                             </div>
-                        <!-- Hidden available teams container for drag/drop functionality -->
-                        <div id="available-teams" class="team-list droppable" style="display: none;">
-                            <!-- Teams will be populated here initially -->
                         </div>
                     </div>
                 </div>
 
                 <div class="form-actions">
                     <button type="submit" id="submit-btn" class="btn-primary">
-                        <span class="btn-text">Estimate Duration</span>
+                        <span class="btn-text">Continue...</span>
                         <span class="loading-spinner" style="display: none;">
                             <div class="spinner"></div>
                             Processing...
@@ -149,8 +194,6 @@
     <script>
         let currentData = null;
         let availableTeams = [];
-        // Load standards info on page load
-        loadStandardsInfo();
 
         document.getElementById('duration-form').addEventListener('submit', function(e) {
             e.preventDefault();
@@ -172,9 +215,22 @@
             
             const formData = new FormData(this);
             
-            // Add team assignments if they exist
+            // Add team assignments and host teams if they exist (for subsequent runs)
             const teamAssignments = getTeamAssignments();
-            if (teamAssignments) {
+            const hostTeams = {
+                silver1_host: document.getElementById('silver-a-host').value,
+                silver2_host: document.getElementById('silver-b-host').value,
+                bronze1_host: document.getElementById('bronze-a-host').value,
+                bronze2_host: document.getElementById('bronze-b-host').value
+            };
+            
+            // Check if we have either team assignments or host teams selected
+            const hasAssignments = hasTeamAssignments(teamAssignments);
+            const hasHostTeams = Object.values(hostTeams).some(host => host && host !== '');
+            const isEstimationRun = hasAssignments || hasHostTeams;
+            
+            if (teamAssignments && isEstimationRun) {
+                teamAssignments.host_teams = hostTeams;
                 formData.append('team_assignments', JSON.stringify(teamAssignments));
             }
             
@@ -186,7 +242,12 @@
             .then(data => {
                 if (data.status === 'success') {
                     currentData = data;
-                    displayResults(data);
+                    
+                    // Only show results if this is an estimation run (not initial file upload)
+                    if (isEstimationRun) {
+                        displayResults(data);
+                    }
+                    
                     showTeamAssignments(data);
                 } else {
                     showError(data.error || 'An error occurred');
@@ -227,22 +288,36 @@
                     html += '<table class="results-table">';
                     html += '<thead><tr>';
                     html += '<th>Meet Type</th>';
-                    html += '<th>Total Qualified Swims</th>';
+                    html += '<th>Swimmer Count</th>';
                     html += '<th>Estimated Duration</th>';
                     html += '</tr></thead><tbody>';
                     
+                    // Generate meet names with host teams
+                    const silver1Name = season.meet_summary.silver_meet_1.host_team && season.meet_summary.silver_meet_1.host_team !== 'TBD' 
+                        ? `Silver-${season.meet_summary.silver_meet_1.host_team}` 
+                        : 'Silver Meet A';
+                    const silver2Name = season.meet_summary.silver_meet_2.host_team && season.meet_summary.silver_meet_2.host_team !== 'TBD' 
+                        ? `Silver-${season.meet_summary.silver_meet_2.host_team}` 
+                        : 'Silver Meet B';
+                    const bronze1Name = season.meet_summary.bronze_meet_1.host_team && season.meet_summary.bronze_meet_1.host_team !== 'TBD' 
+                        ? `Bronze-${season.meet_summary.bronze_meet_1.host_team}` 
+                        : 'Bronze Meet A';
+                    const bronze2Name = season.meet_summary.bronze_meet_2.host_team && season.meet_summary.bronze_meet_2.host_team !== 'TBD' 
+                        ? `Bronze-${season.meet_summary.bronze_meet_2.host_team}` 
+                        : 'Bronze Meet B';
+                    
                     const meets = [
                         { name: 'Gold Meet', data: season.meet_summary.gold_meet },
-                        { name: 'Silver Meet A', data: season.meet_summary.silver_meet_1 },
-                        { name: 'Silver Meet B', data: season.meet_summary.silver_meet_2 },
-                        { name: 'Bronze Meet A', data: season.meet_summary.bronze_meet_1 },
-                        { name: 'Bronze Meet B', data: season.meet_summary.bronze_meet_2 }
+                        { name: silver1Name, data: season.meet_summary.silver_meet_1 },
+                        { name: silver2Name, data: season.meet_summary.silver_meet_2 },
+                        { name: bronze1Name, data: season.meet_summary.bronze_meet_1 },
+                        { name: bronze2Name, data: season.meet_summary.bronze_meet_2 }
                     ];
                     
                     meets.forEach(meet => {
                         html += '<tr>';
                         html += `<td><strong>${meet.name}</strong></td>`;
-                        html += `<td>${meet.data.total_qualifiers}</td>`;
+                        html += `<td>${meet.data.total_swimmers}</td>`;
                         html += `<td>${meet.data.total_duration_formatted}</td>`;
                         html += '</tr>';
                     });
@@ -327,13 +402,22 @@
         }
         
         function formatTime(hundredths) {
-            if (!hundredths || hundredths === '' || hundredths === 0) return '0:00.00';
+            if (!hundredths || hundredths === '' || hundredths === 0) return '00:00.00';
             
             const totalSeconds = hundredths / 100;
             const minutes = Math.floor(totalSeconds / 60);
-            const seconds = totalSeconds % 60;
+            const remainingSeconds = totalSeconds % 60;
             
-            return `${minutes}:${seconds.toFixed(2).padStart(5, '0')}`;
+            // Separate integer seconds and decimal part
+            const integerSeconds = Math.floor(remainingSeconds);
+            const decimalPart = Math.round((remainingSeconds - integerSeconds) * 100);
+            
+            // Pad all components appropriately
+            const paddedMinutes = minutes.toString().padStart(2, '0');
+            const paddedSeconds = integerSeconds.toString().padStart(2, '0');
+            const paddedDecimals = decimalPart.toString().padStart(2, '0');
+            
+            return `${paddedMinutes}:${paddedSeconds}.${paddedDecimals}`;
         }
         
         function showError(message) {
@@ -354,43 +438,100 @@
             // Show the team assignment section
             document.getElementById('team-assignments').style.display = 'block';
             
-            // Populate available teams list
-            const availableContainer = document.getElementById('available-teams');
-            availableContainer.innerHTML = '';
+            // Populate host team selectors
+            populateHostSelectors();
             
-            availableTeams.forEach(team => {
-                const teamElement = document.createElement('div');
-                teamElement.className = 'team-item draggable';
-                teamElement.draggable = true;
-                teamElement.textContent = team;
-                teamElement.dataset.team = team;
-                teamElement.addEventListener('dragstart', handleDragStart);
-                availableContainer.appendChild(teamElement);
-            });
+            // Update meet titles with restored host team selections
+            updateMeetTitles();
             
-            // Setup drag and drop for all droppable areas
-            setupDropZones();
+            // Setup event listeners for host selectors
+            setupHostSelectorListeners();
             
-            // Auto-balance teams on initial display (after DOM update)
-            setTimeout(() => {
-                assignBalanced();
-                // Automatically recalculate with team assignments
-                setTimeout(() => {
-                    recalculateWithAssignments();
-                }, 200);
-            }, 100);
+            // Update the main button text to "Estimate Duration" after first run
+            const submitBtn = document.getElementById('submit-btn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            btnText.textContent = 'Estimate Duration';
+        }
+        
+        function populateHostSelectors() {
+            const selectors = ['silver-a-host', 'silver-b-host', 'bronze-a-host', 'bronze-b-host'];
             
-            // Add recalculate button
-            if (!document.getElementById('recalculate-btn')) {
-                const recalculateBtn = document.createElement('button');
-                recalculateBtn.id = 'recalculate-btn';
-                recalculateBtn.type = 'button';
-                recalculateBtn.className = 'btn-secondary';
-                recalculateBtn.textContent = 'Recalculate with Team Assignments';
-                recalculateBtn.addEventListener('click', recalculateWithAssignments);
+            selectors.forEach(selectorId => {
+                const selector = document.getElementById(selectorId);
+                // Save current selection
+                const currentValue = selector.value;
                 
-                const formActions = document.querySelector('.form-actions');
-                formActions.appendChild(recalculateBtn);
+                // Clear existing options except first
+                selector.innerHTML = '<option value="">Select Host Team</option>';
+                
+                // Add team options
+                availableTeams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team;
+                    option.textContent = team;
+                    selector.appendChild(option);
+                });
+                
+                // Restore previous selection if it still exists in the team list
+                if (currentValue && availableTeams.includes(currentValue)) {
+                    selector.value = currentValue;
+                }
+            });
+        }
+        
+        function setupHostSelectorListeners() {
+            const selectors = ['silver-a-host', 'silver-b-host', 'bronze-a-host', 'bronze-b-host'];
+            
+            selectors.forEach(selectorId => {
+                document.getElementById(selectorId).addEventListener('change', function() {
+                    checkBalanceButtonState();
+                    updateMeetTitles();
+                });
+            });
+        }
+        
+        function checkBalanceButtonState() {
+            const silverAHost = document.getElementById('silver-a-host').value;
+            const silverBHost = document.getElementById('silver-b-host').value;
+            const bronzeAHost = document.getElementById('bronze-a-host').value;
+            const bronzeBHost = document.getElementById('bronze-b-host').value;
+            
+            // Enable balance button if at least one host is selected for each meet type
+            const silverHostsSelected = silverAHost || silverBHost;
+            const bronzeHostsSelected = bronzeAHost || bronzeBHost;
+            
+            const balanceBtn = document.getElementById('balance-meets-btn');
+            balanceBtn.disabled = !(silverHostsSelected && bronzeHostsSelected);
+        }
+        
+        function updateMeetTitles() {
+            const silverAHost = document.getElementById('silver-a-host').value;
+            const silverBHost = document.getElementById('silver-b-host').value;
+            const bronzeAHost = document.getElementById('bronze-a-host').value;
+            const bronzeBHost = document.getElementById('bronze-b-host').value;
+            
+            // Update Silver Meet A title
+            const silver1Title = document.getElementById('silver1-title');
+            if (silver1Title) {
+                silver1Title.textContent = silverAHost ? `🥈 Silver-${silverAHost}` : '🥈 Silver Meet A';
+            }
+            
+            // Update Silver Meet B title
+            const silver2Title = document.getElementById('silver2-title');
+            if (silver2Title) {
+                silver2Title.textContent = silverBHost ? `🥈 Silver-${silverBHost}` : '🥈 Silver Meet B';
+            }
+            
+            // Update Bronze Meet A title
+            const bronze1Title = document.getElementById('bronze1-title');
+            if (bronze1Title) {
+                bronze1Title.textContent = bronzeAHost ? `🥉 Bronze-${bronzeAHost}` : '🥉 Bronze Meet A';
+            }
+            
+            // Update Bronze Meet B title
+            const bronze2Title = document.getElementById('bronze2-title');
+            if (bronze2Title) {
+                bronze2Title.textContent = bronzeBHost ? `🥉 Bronze-${bronzeBHost}` : '🥉 Bronze Meet B';
             }
         }
         
@@ -402,7 +543,7 @@
                 bronze2: []
             };
             
-            // Get teams from each drop zone
+            // Get teams from each assignment display
             const zones = ['silver1', 'silver2', 'bronze1', 'bronze2'];
             zones.forEach(zone => {
                 const container = document.getElementById(`${zone}-teams`);
@@ -415,15 +556,200 @@
             return assignments;
         }
         
+        function balanceMeetsWithHosts() {
+            const silverAHost = document.getElementById('silver-a-host').value;
+            const silverBHost = document.getElementById('silver-b-host').value;
+            const bronzeAHost = document.getElementById('bronze-a-host').value;
+            const bronzeBHost = document.getElementById('bronze-b-host').value;
+            
+            if (!currentData || !currentData.duration_estimates[0] || !currentData.duration_estimates[0].entries_summary) {
+                showError('No team data available for balancing');
+                return;
+            }
+            
+            const entriesSummary = currentData.duration_estimates[0].entries_summary;
+            
+            // Clear existing assignments
+            clearTeamAssignments();
+            
+            // Start with host teams
+            const assignments = {
+                silver1: silverAHost ? [silverAHost] : [],
+                silver2: silverBHost ? [silverBHost] : [],
+                bronze1: bronzeAHost ? [bronzeAHost] : [],
+                bronze2: bronzeBHost ? [bronzeBHost] : []
+            };
+            
+            // Get teams that aren't hosting specific meet types
+            const silverHostTeams = [silverAHost, silverBHost].filter(team => team);
+            const bronzeHostTeams = [bronzeAHost, bronzeBHost].filter(team => team);
+            
+            // For Silver meets: exclude only Silver host teams, but include Bronze host teams
+            const nonSilverHostTeams = availableTeams.filter(team => !silverHostTeams.includes(team));
+            
+            // For Bronze meets: exclude only Bronze host teams, but include Silver host teams  
+            const nonBronzeHostTeams = availableTeams.filter(team => !bronzeHostTeams.includes(team));
+            
+            // Balance Silver meets (including Bronze host teams as eligible)
+            balanceTeamsByQualifiers(nonSilverHostTeams, entriesSummary, 'SILVER', assignments, 'silver1', 'silver2');
+            
+            // Balance Bronze meets (including Silver host teams as eligible)
+            balanceTeamsByQualifiers(nonBronzeHostTeams, entriesSummary, 'BRONZE', assignments, 'bronze1', 'bronze2');
+            
+            // Display the assignments
+            displayTeamAssignments(assignments);
+            
+            // Update meet titles with host team names
+            updateMeetTitles();
+            
+            // Show assignment display
+            document.querySelector('.assignment-display').style.display = 'block';
+        }
+        
+        function balanceTeamsByQualifiers(teams, entriesSummary, meetType, assignments, meet1Key, meet2Key) {
+            // Get qualifier counts for teams
+            const teamQualifiers = teams.map(team => {
+                const teamData = entriesSummary[team];
+                const count = teamData ? (teamData[meetType] || 0) : 0;
+                return { team, count };
+            }).sort((a, b) => b.count - a.count); // Sort by count descending
+            
+            // Calculate current totals including host teams
+            let meet1Total = assignments[meet1Key].reduce((total, team) => {
+                const teamData = entriesSummary[team];
+                return total + (teamData ? (teamData[meetType] || 0) : 0);
+            }, 0);
+            
+            let meet2Total = assignments[meet2Key].reduce((total, team) => {
+                const teamData = entriesSummary[team];
+                return total + (teamData ? (teamData[meetType] || 0) : 0);
+            }, 0);
+            
+            // Distribute remaining teams
+            teamQualifiers.forEach(({ team, count }) => {
+                if (meet1Total <= meet2Total) {
+                    assignments[meet1Key].push(team);
+                    meet1Total += count;
+                } else {
+                    assignments[meet2Key].push(team);
+                    meet2Total += count;
+                }
+            });
+        }
+        
+        function clearTeamAssignments() {
+            const containers = ['silver1-teams', 'silver2-teams', 'bronze1-teams', 'bronze2-teams'];
+            containers.forEach(containerId => {
+                const container = document.getElementById(containerId);
+                container.innerHTML = '<p class="assignment-hint">No teams assigned</p>';
+            });
+        }
+        
+        function displayTeamAssignments(assignments) {
+            const containerMap = {
+                silver1: 'silver1-teams',
+                silver2: 'silver2-teams',
+                bronze1: 'bronze1-teams',
+                bronze2: 'bronze2-teams'
+            };
+            
+            // Store current assignments for reset functionality
+            window.lastBalancedAssignments = JSON.parse(JSON.stringify(assignments));
+            
+            Object.keys(assignments).forEach(key => {
+                const container = document.getElementById(containerMap[key]);
+                const teams = assignments[key];
+                
+                if (teams.length === 0) {
+                    container.innerHTML = '<p class="assignment-hint">No teams assigned</p>';
+                } else {
+                    container.innerHTML = '';
+                    teams.sort().forEach(team => {
+                        const teamElement = createTeamElement(team, key);
+                        container.appendChild(teamElement);
+                    });
+                }
+            });
+            
+            
+            // Sort all team containers to ensure alphabetical order
+            sortAllTeamContainers();
+            
+            // Setup drag and drop
+            setupDragAndDrop();
+        }
+        
+        function createTeamElement(teamName, assignmentKey) {
+            const teamElement = document.createElement('div');
+            teamElement.className = 'team-item draggable';
+            teamElement.draggable = true;
+            teamElement.textContent = teamName;
+            teamElement.dataset.team = teamName;
+            teamElement.dataset.assignmentKey = assignmentKey;
+            
+            // Check if this is a host team in their designated meet
+            const hostMeetForTeam = getHostMeetForTeam(teamName);
+            const isInDesignatedHostMeet = hostMeetForTeam === assignmentKey;
+            
+            if (isHostTeam(teamName)) {
+                teamElement.classList.add('host-team');
+                
+                if (isInDesignatedHostMeet) {
+                    // This is the host team in their designated meet - cannot be removed
+                    teamElement.classList.add('designated-host');
+                    teamElement.style.backgroundColor = '#ffe6cc';
+                    teamElement.style.fontWeight = 'bold';
+                    teamElement.title = 'Host Team - Cannot be removed from this meet';
+                    teamElement.draggable = false;
+                    teamElement.style.cursor = 'not-allowed';
+                } else {
+                    // This is a host team but in a non-designated meet - appears as regular team
+                    teamElement.title = 'Team participating in meet';
+                }
+            }
+            
+            teamElement.addEventListener('dragstart', handleDragStart);
+            return teamElement;
+        }
+        
+        function isHostTeam(teamName) {
+            const silverAHost = document.getElementById('silver-a-host').value;
+            const silverBHost = document.getElementById('silver-b-host').value;
+            const bronzeAHost = document.getElementById('bronze-a-host').value;
+            const bronzeBHost = document.getElementById('bronze-b-host').value;
+            
+            return [silverAHost, silverBHost, bronzeAHost, bronzeBHost].includes(teamName);
+        }
+        
+        function getHostMeetForTeam(teamName) {
+            const silverAHost = document.getElementById('silver-a-host').value;
+            const silverBHost = document.getElementById('silver-b-host').value;
+            const bronzeAHost = document.getElementById('bronze-a-host').value;
+            const bronzeBHost = document.getElementById('bronze-b-host').value;
+            
+            if (teamName === silverAHost) return 'silver1';
+            if (teamName === silverBHost) return 'silver2';
+            if (teamName === bronzeAHost) return 'bronze1';
+            if (teamName === bronzeBHost) return 'bronze2';
+            return null;
+        }
+        
         // Drag and Drop Functions
         let draggedElement = null;
         
         function handleDragStart(e) {
+            // Prevent dragging designated host teams from their host meets
+            if (e.target.classList.contains('designated-host') && !e.target.draggable) {
+                e.preventDefault();
+                return;
+            }
+            
             draggedElement = e.target;
             e.dataTransfer.effectAllowed = 'move';
+            e.target.style.opacity = '0.5';
         }
         
-        function setupDropZones() {
+        function setupDragAndDrop() {
             const dropZones = document.querySelectorAll('.droppable');
             dropZones.forEach(zone => {
                 zone.addEventListener('dragover', handleDragOver);
@@ -440,218 +766,145 @@
         
         function handleDragEnter(e) {
             e.preventDefault();
-            e.target.classList.add('drag-over');
+            if (e.target.classList.contains('droppable')) {
+                e.target.style.backgroundColor = '#e8f5e8';
+                e.target.style.borderColor = '#28a745';
+            }
         }
         
         function handleDragLeave(e) {
-            e.target.classList.remove('drag-over');
+            if (e.target.classList.contains('droppable')) {
+                e.target.style.backgroundColor = '';
+                e.target.style.borderColor = '';
+            }
         }
         
         function handleDrop(e) {
             e.preventDefault();
-            e.target.classList.remove('drag-over');
+            
+            if (e.target.classList.contains('droppable')) {
+                e.target.style.backgroundColor = '';
+                e.target.style.borderColor = '';
+            }
             
             if (draggedElement) {
-                // Remove hint text if present
-                const hints = e.target.querySelectorAll('.drop-hint');
-                hints.forEach(hint => hint.style.display = 'none');
+                const targetContainer = e.target.closest('.droppable');
+                const sourceContainer = draggedElement.parentNode;
                 
-                // Move the team element
-                e.target.appendChild(draggedElement);
+                if (targetContainer) {
+                    const teamName = draggedElement.dataset.team;
+                    const targetId = targetContainer.id;
+                    
+                    
+                    // Remove hint text if present
+                    const hints = targetContainer.querySelectorAll('.assignment-hint');
+                    hints.forEach(hint => hint.remove());
+                    
+                    // Reset dragged element style
+                    draggedElement.style.opacity = '1';
+                    
+                    // Update the assignment key for the new container
+                    const newAssignmentKey = getAssignmentKeyFromContainer(targetId);
+                    if (newAssignmentKey) {
+                        draggedElement.dataset.assignmentKey = newAssignmentKey;
+                        // Recreate the element with proper styling for new context
+                        const newElement = createTeamElement(teamName, newAssignmentKey);
+                        targetContainer.appendChild(newElement);
+                        draggedElement.remove();
+                    }
+                    
+                    // Update hint text in containers if they're now empty
+                    updateContainerHints();
+                    
+                    // Sort teams in target container to maintain alphabetical order
+                    sortTeamsInContainer(targetContainer.id);
+                    
+                    // Sort the source container as well (in case it still has teams)
+                    if (sourceContainer && sourceContainer.id && sourceContainer !== targetContainer) {
+                        sortTeamsInContainer(sourceContainer.id);
+                    }
+                }
                 draggedElement = null;
             }
         }
         
-        // Quick Assignment Functions
-        function assignBalanced() {
-            // Clear all assignments first
-            clearAssignmentsWithoutRebalance();
-            
-            if (!currentData || !currentData.duration_estimates[0] || !currentData.duration_estimates[0].entries_summary) {
-                // Fallback to simple alternating if no data available
-                assignSimpleAlternating();
-                return;
-            }
-            
-            const entriesSummary = currentData.duration_estimates[0].entries_summary;
-            
-            // Get Silver and Bronze qualifier counts for each team
-            const teamQualifiers = {};
-            availableTeams.forEach(team => {
-                const teamData = entriesSummary[team];
-                if (teamData) {
-                    teamQualifiers[team] = {
-                        silver: teamData.SILVER || 0,
-                        bronze: teamData.BRONZE || 0
-                    };
-                }
-            });
-            
-            // Balance Silver meets
-            balanceMeetsByQualifiers(teamQualifiers, 'silver', ['silver1-teams', 'silver2-teams']);
-            
-            // Balance Bronze meets  
-            balanceMeetsByQualifiers(teamQualifiers, 'bronze', ['bronze1-teams', 'bronze2-teams']);
-            
-            // Clear available teams since they're all assigned
-            const availableContainer = document.getElementById('available-teams');
-            availableContainer.innerHTML = '<p class="drop-hint">All teams assigned</p>';
-        }
-        
-        function balanceMeetsByQualifiers(teamQualifiers, meetType, containers) {
-            // Sort teams by qualifier count for this meet type (descending)
-            const sortedTeams = [...availableTeams].sort((a, b) => {
-                const aCount = teamQualifiers[a] ? teamQualifiers[a][meetType] : 0;
-                const bCount = teamQualifiers[b] ? teamQualifiers[b][meetType] : 0;
-                return bCount - aCount;
-            });
-            
-            // Distribute teams to balance total qualifiers
-            let meet1Total = 0, meet2Total = 0;
-            
-            sortedTeams.forEach((team, index) => {
-                const teamCount = teamQualifiers[team] ? teamQualifiers[team][meetType] : 0;
-                
-                // Add to the meet with fewer current qualifiers
-                if (meet1Total <= meet2Total) {
-                    moveTeamToContainer(team, containers[0]);
-                    meet1Total += teamCount;
-                } else {
-                    moveTeamToContainer(team, containers[1]);
-                    meet2Total += teamCount;
-                }
-            });
-        }
-        
-        function assignSimpleAlternating() {
-            // Fallback function for simple alternating assignment
-            // Teams qualify for either Silver OR Bronze, not both
-            const silverContainers = ['silver1-teams', 'silver2-teams'];
-            const bronzeContainers = ['bronze1-teams', 'bronze2-teams'];
-            
-            availableTeams.forEach((team, index) => {
-                // Assign to Silver meets
-                moveTeamToContainer(team, silverContainers[index % 2]);
-                // Assign to Bronze meets  
-                moveTeamToContainer(team, bronzeContainers[index % 2]);
-            });
-        }
-        
-        function clearAssignments() {
-            clearAssignmentsWithoutRebalance();
-            // Auto-balance teams again
-            assignBalanced();
-        }
-        
-        function clearAssignmentsWithoutRebalance() {
-            // Move all teams back to available
-            const assignedTeams = document.querySelectorAll('.team-item');
-            const availableContainer = document.getElementById('available-teams');
-            
-            assignedTeams.forEach(team => {
-                availableContainer.appendChild(team);
-            });
-            
-            // Show hint text again
-            const hints = document.querySelectorAll('.drop-hint');
-            hints.forEach(hint => hint.style.display = 'block');
-        }
-        
-        function moveTeamToContainer(teamName, containerId) {
-            const container = document.getElementById(containerId);
-            
-            if (container) {
-                // Create a new team element (since teams can be in multiple meets)
-                const teamElement = document.createElement('div');
-                teamElement.className = 'team-item draggable';
-                teamElement.draggable = true;
-                teamElement.textContent = teamName;
-                teamElement.dataset.team = teamName;
-                teamElement.addEventListener('dragstart', handleDragStart);
-                
-                // Hide hint text
-                const hints = container.querySelectorAll('.drop-hint');
-                hints.forEach(hint => hint.style.display = 'none');
-                container.appendChild(teamElement);
-                
-                // Sort teams alphabetically within the container
-                sortTeamsInContainer(containerId);
-            }
+        function getAssignmentKeyFromContainer(containerId) {
+            const containerMap = {
+                'silver1-teams': 'silver1',
+                'silver2-teams': 'silver2',
+                'bronze1-teams': 'bronze1',
+                'bronze2-teams': 'bronze2'
+            };
+            return containerMap[containerId] || null;
         }
         
         function sortTeamsInContainer(containerId) {
             const container = document.getElementById(containerId);
             if (!container) return;
             
+            // Get all team elements
             const teamElements = Array.from(container.querySelectorAll('.team-item'));
-            teamElements.sort((a, b) => a.textContent.localeCompare(b.textContent));
+            
+            if (teamElements.length <= 1) return; // No need to sort if 0 or 1 elements
+            
+            // Sort team elements alphabetically by team name
+            teamElements.sort((a, b) => {
+                const teamA = a.dataset.team || a.textContent;
+                const teamB = b.dataset.team || b.textContent;
+                return teamA.localeCompare(teamB);
+            });
+            
+            // Remove all team elements from container
+            teamElements.forEach(element => element.remove());
             
             // Re-append in sorted order
             teamElements.forEach(element => container.appendChild(element));
         }
         
-        function recalculateWithAssignments() {
-            if (!currentData) return;
-            
-            const teamAssignments = getTeamAssignments();
-            const formData = new FormData(document.getElementById('duration-form'));
-            formData.append('team_assignments', JSON.stringify(teamAssignments));
-            
-            const submitBtn = document.getElementById('submit-btn');
-            const btnText = submitBtn.querySelector('.btn-text');
-            const loadingSpinner = submitBtn.querySelector('.loading-spinner');
-            
-            // Show loading state
-            btnText.style.display = 'none';
-            loadingSpinner.style.display = 'inline-flex';
-            submitBtn.disabled = true;
-            
-            fetch('/estimate-current-meet-duration', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    currentData = data;
-                    displayResults(data);
-                } else {
-                    showError(data.error || 'An error occurred');
-                }
-            })
-            .catch(error => {
-                showError('Network error: ' + error.message);
-            })
-            .finally(() => {
-                // Reset loading state
-                btnText.style.display = 'inline';
-                loadingSpinner.style.display = 'none';
-                submitBtn.disabled = false;
+        function sortAllTeamContainers() {
+            const containers = ['silver1-teams', 'silver2-teams', 'bronze1-teams', 'bronze2-teams'];
+            containers.forEach(containerId => {
+                sortTeamsInContainer(containerId);
             });
         }
-        // Load standards modification date
-        async function loadStandardsInfo() {
-            try {
-                const response = await fetch('/standards-info');
-                if (response.ok) {
-                    const data = await response.json();
-                    const dateElement = document.getElementById('standards-date');
-                    if (dateElement) {
-                        dateElement.textContent = data.last_modified;
+        
+        function updateContainerHints() {
+            const containers = ['silver1-teams', 'silver2-teams', 'bronze1-teams', 'bronze2-teams'];
+            containers.forEach(containerId => {
+                const container = document.getElementById(containerId);
+                const teamItems = container.querySelectorAll('.team-item');
+                const existingHints = container.querySelectorAll('.assignment-hint');
+                
+                if (teamItems.length === 0) {
+                    // Only add hint if one doesn't already exist
+                    if (existingHints.length === 0) {
+                        const hint = document.createElement('p');
+                        hint.className = 'assignment-hint';
+                        hint.textContent = 'No teams assigned';
+                        container.appendChild(hint);
                     }
                 } else {
-                    const dateElement = document.getElementById('standards-date');
-                    if (dateElement) {
-                        dateElement.textContent = 'Unknown';
-                    }
+                    // Remove hints if there are teams present
+                    existingHints.forEach(hint => hint.remove());
                 }
-            } catch (error) {
-                console.error('Failed to load standards info:', error);
-                const dateElement = document.getElementById('standards-date');
-                if (dateElement) {
-                    dateElement.textContent = 'Unknown';
-                }
+            });
+        }
+        
+        function hasTeamAssignments(assignments) {
+            // Check if any assignments have teams
+            return Object.values(assignments).some(teamList => teamList && teamList.length > 0);
+        }
+        
+        function resetToBalanced() {
+            if (window.lastBalancedAssignments) {
+                displayTeamAssignments(window.lastBalancedAssignments);
+            } else {
+                // Fallback to re-balancing
+                balanceMeetsWithHosts();
             }
+            
+            // Ensure everything is sorted after reset
+            sortAllTeamContainers();
         }
     </script>
 </body>

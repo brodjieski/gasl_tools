@@ -10,6 +10,11 @@ class TimeStandardsService:
     """Service class for calculating swimming time standards and meet analysis."""
     
     def __init__(self):
+        # Relay time adjustments in hundredths of seconds (minutes * 60 * 100)
+        self.RELAY_TIME_GOLD = 25 * 60 * 100    # 25 minutes
+        self.RELAY_TIME_SILVER = 20 * 60 * 100  # 20 minutes
+        self.RELAY_TIME_BRONZE = 15 * 60 * 100  # 15 minutes
+        
         self.event_map = {
             "Boys 10 & Under_100_Individual Medley": 4,
             "Boys 11-12_50_Backstroke": 30,
@@ -384,10 +389,10 @@ class TimeStandardsService:
         total_silver_duration = sum(silver_event_times) if silver_event_times else 0
         total_bronze_duration = sum(bronze_event_times) if bronze_event_times else 0
         
-        # Calculate total qualifiers
-        total_gold_qualifiers = sum(gold_qualifiers) if gold_qualifiers else 0
-        total_silver_qualifiers = sum(silver_qualifiers) if silver_qualifiers else 0
-        total_bronze_qualifiers = sum(bronze_qualifiers) if bronze_qualifiers else 0
+        # Calculate unique swimmer counts (not total qualifiers)
+        gold_swimmers = len(cleaned_up_entries[cleaned_up_entries['qualified_meet'] == 'GOLD']['athlete_id'].unique())
+        silver_swimmers = len(cleaned_up_entries[cleaned_up_entries['qualified_meet'] == 'SILVER']['athlete_id'].unique())
+        bronze_swimmers = len(cleaned_up_entries[cleaned_up_entries['qualified_meet'] == 'BRONZE']['athlete_id'].unique())
         
         # Create meet summary based on team assignments
         if team_assignments:
@@ -400,34 +405,39 @@ class TimeStandardsService:
             # Convert to regular Python ints for JSON serialization
             silver_meet_duration = int(total_silver_duration // 2)
             bronze_meet_duration = int(total_bronze_duration // 2)
-            silver_meet_qualifiers = int(total_silver_qualifiers // 2)
-            bronze_meet_qualifiers = int(total_bronze_qualifiers // 2)
+            silver_meet_swimmers = int(silver_swimmers // 2)
+            bronze_meet_swimmers = int(bronze_swimmers // 2)
+            
+            # Add relay times to durations
+            gold_duration_with_relay = int(total_gold_duration) + self.RELAY_TIME_GOLD
+            silver_duration_with_relay = int(silver_meet_duration) + self.RELAY_TIME_SILVER
+            bronze_duration_with_relay = int(bronze_meet_duration) + self.RELAY_TIME_BRONZE
             
             meet_summary = {
                 'gold_meet': {
-                    'total_qualifiers': int(total_gold_qualifiers),
-                    'total_duration_hundredths': int(total_gold_duration),
-                    'total_duration_formatted': convert_hundredths_to_time(total_gold_duration)
+                    'total_swimmers': int(gold_swimmers),
+                    'total_duration_hundredths': gold_duration_with_relay,
+                    'total_duration_formatted': convert_hundredths_to_time(gold_duration_with_relay)
                 },
                 'silver_meet_1': {
-                    'total_qualifiers': silver_meet_qualifiers,
-                    'total_duration_hundredths': silver_meet_duration,
-                    'total_duration_formatted': convert_hundredths_to_time(silver_meet_duration)
+                    'total_swimmers': silver_meet_swimmers,
+                    'total_duration_hundredths': silver_duration_with_relay,
+                    'total_duration_formatted': convert_hundredths_to_time(silver_duration_with_relay)
                 },
                 'silver_meet_2': {
-                    'total_qualifiers': silver_meet_qualifiers,
-                    'total_duration_hundredths': silver_meet_duration,
-                    'total_duration_formatted': convert_hundredths_to_time(silver_meet_duration)
+                    'total_swimmers': silver_meet_swimmers,
+                    'total_duration_hundredths': silver_duration_with_relay,
+                    'total_duration_formatted': convert_hundredths_to_time(silver_duration_with_relay)
                 },
                 'bronze_meet_1': {
-                    'total_qualifiers': bronze_meet_qualifiers,
-                    'total_duration_hundredths': bronze_meet_duration,
-                    'total_duration_formatted': convert_hundredths_to_time(bronze_meet_duration)
+                    'total_swimmers': bronze_meet_swimmers,
+                    'total_duration_hundredths': bronze_duration_with_relay,
+                    'total_duration_formatted': convert_hundredths_to_time(bronze_duration_with_relay)
                 },
                 'bronze_meet_2': {
-                    'total_qualifiers': bronze_meet_qualifiers,
-                    'total_duration_hundredths': bronze_meet_duration,
-                    'total_duration_formatted': convert_hundredths_to_time(bronze_meet_duration)
+                    'total_swimmers': bronze_meet_swimmers,
+                    'total_duration_hundredths': bronze_duration_with_relay,
+                    'total_duration_formatted': convert_hundredths_to_time(bronze_duration_with_relay)
                 }
             }
         
@@ -443,29 +453,37 @@ class TimeStandardsService:
         heat_time_hundredths = heat_time * 100
         event_delay_hundredths = event_delay * 100
         
+        # Extract host team information if provided
+        host_teams = team_assignments.get('host_teams', {})
+        
         meet_summary = {}
         
         # Calculate Gold meet (all Gold qualifiers)
         gold_entries = entries[entries['qualified_meet'] == 'GOLD']
-        gold_duration, gold_qualifiers = self._calculate_meet_duration_for_entries(
+        gold_duration, _ = self._calculate_meet_duration_for_entries(
             gold_entries, current_times, heat_time_hundredths, event_delay_hundredths
         )
+        # Count unique swimmers in gold meet
+        gold_swimmers = len(gold_entries['athlete_id'].unique()) if len(gold_entries) > 0 else 0
+        
+        # Add relay time to gold meet duration
+        gold_duration_with_relay = int(gold_duration) + self.RELAY_TIME_GOLD
         
         meet_summary['gold_meet'] = {
-            'total_qualifiers': int(gold_qualifiers),
-            'total_duration_hundredths': int(gold_duration),
-            'total_duration_formatted': convert_hundredths_to_time(gold_duration)
+            'total_swimmers': int(gold_swimmers),
+            'total_duration_hundredths': gold_duration_with_relay,
+            'total_duration_formatted': convert_hundredths_to_time(gold_duration_with_relay)
         }
         
         # Calculate Silver and Bronze meets based on team assignments
         meets = {
-            'silver_meet_1': ('SILVER', team_assignments.get('silver1', [])),
-            'silver_meet_2': ('SILVER', team_assignments.get('silver2', [])),
-            'bronze_meet_1': ('BRONZE', team_assignments.get('bronze1', [])),
-            'bronze_meet_2': ('BRONZE', team_assignments.get('bronze2', []))
+            'silver_meet_1': ('SILVER', team_assignments.get('silver1', []), host_teams.get('silver1_host', 'TBD')),
+            'silver_meet_2': ('SILVER', team_assignments.get('silver2', []), host_teams.get('silver2_host', 'TBD')),
+            'bronze_meet_1': ('BRONZE', team_assignments.get('bronze1', []), host_teams.get('bronze1_host', 'TBD')),
+            'bronze_meet_2': ('BRONZE', team_assignments.get('bronze2', []), host_teams.get('bronze2_host', 'TBD'))
         }
         
-        for meet_name, (qualification_level, assigned_teams) in meets.items():
+        for meet_name, (qualification_level, assigned_teams, host_team) in meets.items():
             if assigned_teams:
                 # Filter entries by qualification level and assigned teams
                 meet_entries = entries[
@@ -476,15 +494,24 @@ class TimeStandardsService:
                 # If no teams assigned, use empty entries
                 meet_entries = entries[entries['qualified_meet'] == 'DUMMY']  # Empty result
             
-            duration, qualifiers = self._calculate_meet_duration_for_entries(
+            duration, _ = self._calculate_meet_duration_for_entries(
                 meet_entries, current_times, heat_time_hundredths, event_delay_hundredths
             )
+            # Count unique swimmers in this meet
+            swimmers = len(meet_entries['athlete_id'].unique()) if len(meet_entries) > 0 else 0
+            
+            # Add appropriate relay time based on meet type
+            if qualification_level == 'SILVER':
+                duration_with_relay = int(duration) + self.RELAY_TIME_SILVER
+            else:  # BRONZE
+                duration_with_relay = int(duration) + self.RELAY_TIME_BRONZE
             
             meet_summary[meet_name] = {
-                'total_qualifiers': int(qualifiers),
-                'total_duration_hundredths': int(duration),
-                'total_duration_formatted': convert_hundredths_to_time(duration),
-                'assigned_teams': assigned_teams
+                'total_swimmers': int(swimmers),
+                'total_duration_hundredths': duration_with_relay,
+                'total_duration_formatted': convert_hundredths_to_time(duration_with_relay),
+                'assigned_teams': assigned_teams,
+                'host_team': host_team
             }
         
         return meet_summary
